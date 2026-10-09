@@ -6,10 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "embed": "tsx src/scripts/embed-and-store.ts",
+    "test:qdrant": "tsx src/scripts/test-qdrant.ts",
+    "setup:qdrant": "tsx src/scripts/setup-qdrant.ts",
+    "test:conversation": "tsx src/scripts/test-conversation.ts"
   },
   "dependencies": {
+    "@qdrant/js-client-rest": "^1.19.0",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.4.2",
     "next": "16.3.5",
+    "openai": "^7.15.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -22,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }
