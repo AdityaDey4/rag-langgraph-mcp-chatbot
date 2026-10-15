@@ -1,0 +1,2216 @@
+{
+  "createdAt": "2026-10-14T13:04:01.394Z",
+  "options": {
+    "classic": true,
+    "repeat": 2,
+    "only": null
+  },
+  "agent": {
+    "summary": {
+      "label": "AGENT",
+      "n": 34,
+      "taskSuccess": 0.8823529411764706,
+      "toolBehaviourOk": 1,
+      "answerOk": 0.8823529411764706,
+      "meanSteps": 2.4705882352941178,
+      "meanToolCalls": 1.7058823529411764,
+      "meanChatTokens": 4560.294117647059,
+      "meanEmbeddingTokens": 5.9411764705882355,
+      "meanCostUsd": 0.0007344752941176471,
+      "meanLatencyMs": 3842.9117647058824
+    },
+    "outcomes": [
+      {
+        "id": "greet-1",
+        "category": "greeting",
+        "run": {
+          "path": "agent",
+          "question": "Hi there!",
+          "answer": "Hello! How can I assist you today?",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 1,
+          "inputTokens": 1081,
+          "outputTokens": 10,
+          "embeddingTokens": 0,
+          "costUsd": 0.00016815,
+          "latencyMs": 1023,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer provides a brief, polite greeting and offers help."
+        },
+        "pass": true
+      },
+      {
+        "id": "greet-1",
+        "category": "greeting",
+        "run": {
+          "path": "agent",
+          "question": "Hi there!",
+          "answer": "Hello! How can I assist you today?",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 1,
+          "inputTokens": 1081,
+          "outputTokens": 10,
+          "embeddingTokens": 0,
+          "costUsd": 0.00016815,
+          "latencyMs": 816,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer provides a brief, polite greeting and offers help."
+        },
+        "pass": true
+      },
+      {
+        "id": "greet-2",
+        "category": "greeting",
+        "run": {
+          "path": "agent",
+          "question": "Thanks, that's helpful.",
+          "answer": "You're welcome! If you have any more questions or need assistance, feel free to ask.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 1,
+          "inputTokens": 1083,
+          "outputTokens": 19,
+          "embeddingTokens": 0,
+          "costUsd": 0.00017385,
+          "latencyMs": 1323,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer provides a polite acknowledgment and offers further assistance."
+        },
+        "pass": true
+      },
+      {
+        "id": "greet-2",
+        "category": "greeting",
+        "run": {
+          "path": "agent",
+          "question": "Thanks, that's helpful.",
+          "answer": "You're welcome! If you have any more questions or need assistance, feel free to ask.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 1,
+          "inputTokens": 1083,
+          "outputTokens": 19,
+          "embeddingTokens": 0,
+          "costUsd": 0.00017385,
+          "latencyMs": 1085,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer provides a polite acknowledgment and offers further assistance."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-kafka",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "What is Kafka?",
+          "answer": "Apache Kafka is a distributed event-streaming platform designed to handle large volumes of events reliably, allowing producers to publish events to topics for independent reading by consumers. This facilitates asynchronous communication between components and reduces direct coupling between services. Kafka topics are divided into partitions, enabling parallel processing by different consumers [fd04038f-7ec2-4e72-ac28-96bcb47633fe].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2931,
+          "outputTokens": 95,
+          "embeddingTokens": 2,
+          "costUsd": 0.0004969099999999999,
+          "latencyMs": 2675,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly describes Kafka as a distributed event-streaming platform that handles large volumes of events reliably."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-kafka",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "What is Kafka?",
+          "answer": "Kafka is an Apache distributed event-streaming platform designed for handling large volumes of events reliably. It allows producers to publish events to topics, which consumers can then read independently, facilitating asynchronous communication and reducing direct coupling between services. Kafka topics are divided into partitions, with each partition being an ordered sequence of records, enabling parallel processing by different consumers within a consumer group [fd04038f-7ec2-4e72-ac28-96bcb47633fe].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2931,
+          "outputTokens": 109,
+          "embeddingTokens": 2,
+          "costUsd": 0.0005053099999999999,
+          "latencyMs": 2969,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly describes Kafka as a distributed event-streaming platform that handles large volumes of events reliably, including details about producers, topics, and consumers."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-redis-rank",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "Which Redis data structure would you use to implement a ranking system?",
+          "answer": "To implement a ranking system in Redis, you would typically use **sorted sets**. This data structure allows you to store unique elements, each associated with a score, which can be used to maintain and order the rankings effectively. Sorted sets support efficient range queries and score updates, making them ideal for ranking applications. [3cad5c5b-ff31-4d79-8f10-383364293898].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis data structure ranking system"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis sorted sets ranking system"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis data structures overview"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8887,
+          "outputTokens": 140,
+          "embeddingTokens": 14,
+          "costUsd": 0.00141887,
+          "latencyMs": 6190,
+          "stoppedBy": null,
+          "citations": [
+            "3cad5c5b-ff31-4d79-8f10-383364293898"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly identifies sorted sets as the data structure for a ranking system."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-redis-rank",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "Which Redis data structure would you use to implement a ranking system?",
+          "answer": "The documents do not seem to cover specific information about which Redis data structure to use for implementing a ranking system. However, based on general knowledge, Redis sorted sets are typically used for this purpose, as they effectively maintain ordered data and allow for efficient rank retrieval.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis data structure for ranking system"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis sorted sets for ranking system"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis ranking system sorted set"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis sorted set implementation ranking"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 5,
+          "chatCalls": 5,
+          "inputTokens": 13034,
+          "outputTokens": 127,
+          "embeddingTokens": 22,
+          "costUsd": 0.0020341599999999997,
+          "latencyMs": 9346,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly identifies sorted sets as the appropriate Redis data structure."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-ttl",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "What are TTLs used for in Redis caching?",
+          "answer": "The documents do not seem to cover the specific use of TTLs (Time-to-Live) in Redis caching.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "TTLs in Redis caching"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "TTL functionality in Redis caching"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis TTL usage and benefits"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8868,
+          "outputTokens": 78,
+          "embeddingTokens": 17,
+          "costUsd": 0.00137921,
+          "latencyMs": 5716,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not address the use of TTLs in preventing cached data from remaining indefinitely."
+        },
+        "pass": false
+      },
+      {
+        "id": "single-ttl",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "What are TTLs used for in Redis caching?",
+          "answer": "The documents do not seem to cover the specific use of TTLs in Redis caching.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "TTLs used in Redis caching"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "TTL in Redis caching usage"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis caching TTL function"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8926,
+          "outputTokens": 72,
+          "embeddingTokens": 17,
+          "costUsd": 0.00138431,
+          "latencyMs": 5100,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not address the use of TTLs in Redis caching."
+        },
+        "pass": false
+      },
+      {
+        "id": "single-groups",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "Can two different Kafka consumer groups consume the same event?",
+          "answer": "Yes, two different Kafka consumer groups can independently consume the same event. Kafka tracks offsets separately for each consumer group, allowing multiple applications to process the same event simultaneously. This design enables asynchronous communication and reduces coupling between services [fd04038f-7ec2-4e72-ac28-96bcb47633fe].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka consumer groups consume the same event"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka multiple consumer groups same event"
+              },
+              "isError": false
+            },
+            {
+              "name": "get_chunk",
+              "args": {
+                "chunkId": "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8629,
+          "outputTokens": 141,
+          "embeddingTokens": 15,
+          "costUsd": 0.0013808999999999998,
+          "latencyMs": 5654,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains that Kafka tracks offsets separately for each consumer group, allowing multiple applications to consume the same event."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-groups",
+        "category": "single",
+        "run": {
+          "path": "agent",
+          "question": "Can two different Kafka consumer groups consume the same event?",
+          "answer": "Yes, two different Kafka consumer groups can consume the same event independently. Kafka tracks offsets separately for each group, allowing multiple applications to process the same event [fd04038f-7ec2-4e72-ac28-96bcb47633fe].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka consumer groups consume same event"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka multiple consumer groups consuming same event"
+              },
+              "isError": false
+            },
+            {
+              "name": "get_chunk",
+              "args": {
+                "chunkId": "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8628,
+          "outputTokens": 128,
+          "embeddingTokens": 15,
+          "costUsd": 0.00137295,
+          "latencyMs": 5134,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains that Kafka tracks offsets separately for each consumer group."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-redis-kafka",
+        "category": "comparison",
+        "run": {
+          "path": "agent",
+          "question": "Compare Redis and Kafka.",
+          "answer": "**Comparison of Redis and Kafka:**\n\n- **Redis**: \n  - Redis is an in-memory data store typically utilized for caching, session storage, counters, and lightweight coordination between services. It offers low-latency operations and supports various data structures, including strings, hashes, lists, sets, and sorted sets. Redis is useful in distributed systems facilitating operations like distributed locks and session management. However, it is not a full-fledged database and its role depends on data durability and consistency needs [3cad5c5b-ff31-4d79-8f10-383364293898][795e6e5d-cfbd-4ef1-9ab2-62549da54d5b].\n\n- **Kafka**: \n  - Apache Kafka is a distributed event-streaming platform designed for handling large volumes of events reliably. It facilitates asynchronous communication through topics, with producers publishing and consumers independently reading events. Kafka's architecture allows for scaling by partitioning topics, enabling parallel processing by different consumers [fd04038f-7ec2-4e72-ac28-96bcb47633fe].\n\nIn summary, Redis is optimized for in-memory data operations with various data structures, while Kafka focuses on event streaming and asynchronous communication between distributed services.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis features and characteristics",
+                "topK": 4
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka features and characteristics",
+                "topK": 4
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 3869,
+          "outputTokens": 321,
+          "embeddingTokens": 9,
+          "costUsd": 0.00077412,
+          "latencyMs": 5269,
+          "stoppedBy": null,
+          "citations": [
+            "3cad5c5b-ff31-4d79-8f10-383364293898",
+            "795e6e5d-cfbd-4ef1-9ab2-62549da54d5b",
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both Redis and Kafka, detailing their functionalities and use cases."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-redis-kafka",
+        "category": "comparison",
+        "run": {
+          "path": "agent",
+          "question": "Compare Redis and Kafka.",
+          "answer": "**Comparison of Redis and Kafka:**\n\n1. **Purpose:**\n   - **Redis**: An in-memory data store primarily used for caching, session storage, counters, and distributed coordination. It supports low-latency operations [3cad5c5b-ff31-4d79-8f10-383364293898].\n   - **Kafka**: A distributed event-streaming platform designed for handling large volumes of events reliably. It facilitates asynchronous communication between services [fd04038f-7ec2-4e72-ac28-96bcb47633fe].\n\n2. **Architecture:**\n   - **Redis**: Operates primarily in memory, which allows for fast data access and various data structures like strings, hashes, and lists [3cad5c5b-ff31-4d79-8f10-383364293898].\n   - **Kafka**: Uses a partitioned topic structure where each partition is an ordered sequence of records, allowing for scalable consumption by multiple consumers [fd04038f-7ec2-4e72-ac28-96bcb47633fe].\n\n3. **Use Cases:**\n   - **Redis**: Suitable for scenarios requiring quick response times, such as caching, real-time analytics, and lightweight coordination between services [795e6e5d-cfbd-4ef1-9ab2-62549da54d5b].\n   - **Kafka**: Best utilized in real-time data pipelines, stream processing, and systems where event streaming is critical [fd04038f-7ec2-4e72-ac28-96bcb47633fe].\n\n4. **Consistency and Durability:**\n   - **Redis**: Not a replacement for databases; its use depends on durability and consistency requirements[795e6e5d-cfbd-4ef1-9ab2-62549da54d5b].\n   - **Kafka**: Designed for high throughput and fault tolerance with a focus on delivering messages reliably [fd04038f-7ec2-4e72-ac28-96bcb47633fe]. \n\nOverall, Redis is ideal for scenarios demanding quick data retrieval, while Kafka excels in handling massive streams of data across distributed systems.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "compare Redis and Kafka",
+                "topK": 4
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis features",
+                "topK": 4
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka features",
+                "topK": 4
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 4665,
+          "outputTokens": 543,
+          "embeddingTokens": 9,
+          "costUsd": 0.0010267199999999998,
+          "latencyMs": 7359,
+          "stoppedBy": null,
+          "citations": [
+            "3cad5c5b-ff31-4d79-8f10-383364293898",
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe",
+            "795e6e5d-cfbd-4ef1-9ab2-62549da54d5b"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both Redis and Kafka, detailing their purposes, architectures, use cases, and consistency."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-dbms-redis",
+        "category": "comparison",
+        "run": {
+          "path": "agent",
+          "question": "How do a DBMS and Redis differ for storing data, based on the documents?",
+          "answer": "A Database Management System (DBMS) organizes data in tables with structured relationships and uses SQL for querying, while Redis is an in-memory data store optimized for speed, often used for caching and various data structures like hashes and sets [2eb1f2fe-1aa2-449d-8356-d9820ee8efd7][3cad5c5b-ff31-4d79-8f10-383364293898]. Redis provides low-latency access and is suitable for temporary data, but it is not a full replacement for traditional databases [795e6e5d-cfbd-4ef1-9ab2-62549da54d5b].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "DBMS data storage"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis data storage"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 3839,
+          "outputTokens": 194,
+          "embeddingTokens": 7,
+          "costUsd": 0.0006931600000000001,
+          "latencyMs": 4092,
+          "stoppedBy": null,
+          "citations": [
+            "2eb1f2fe-1aa2-449d-8356-d9820ee8efd7",
+            "3cad5c5b-ff31-4d79-8f10-383364293898",
+            "795e6e5d-cfbd-4ef1-9ab2-62549da54d5b"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both DBMS and Redis, including their characteristics and differences."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-dbms-redis",
+        "category": "comparison",
+        "run": {
+          "path": "agent",
+          "question": "How do a DBMS and Redis differ for storing data, based on the documents?",
+          "answer": "The differences between a DBMS and Redis for data storage are as follows:\n\n1. **Data Storage Structure**:\n   - A Database Management System (DBMS) organizes information into tables with rows and columns, focusing on relationships using keys [2eb1f2fe-1aa2-449d-8356-d9820ee8efd7].\n   - Redis is an in-memory data store that supports various structures like strings, hashes, lists, and sets, optimized for fast temporary data access [3cad5c5b-ff31-4d79-8f10-383364293898].\n\n2. **Primary Use Cases**:\n   - DBMS is used for managing structured data, suitable for complex querying and transactional operations [2eb1f2fe-1aa2-449d-8356-d9820ee8efd7].\n   - Redis is commonly used for caching, session storage, and operations requiring low-latency access [3cad5c5b-ff31-4d79-8f10-383364293898].\n\n3. **Durability and Consistency**:\n   - A DBMS typically provides strong durability and consistency guarantees suitable for critical data management [4bc60bc6-51c6-4060-83fc-bb67eec9f8cc].\n   - Redis is designed for speed and may not offer the same level of durability; its use is dependent on specific requirements for persistence and consistency [795e6e5d-cfbd-4ef1-9ab2-62549da54d5b].\n\n4. **Performance**:\n   - DBMS operations can involve more overhead due to their structured nature and transactional support [4bc60bc6-51c6-4060-83fc-bb67eec9f8cc].\n   - Redis operations are generally low-latency and faster because it primarily stores data in memory [3cad5c5b-ff31-4d79-8f10-383364293898].\n\n5. **System Design Features**:\n   - DBMS concepts include replication, sharding, and consistency management, making it complex but powerful for enterprise-level applications [4bc60bc6-51c6-4060-83fc-bb67eec9f8cc].\n   - Redis supports lightweight operations like rate limiting and distributed coordination but should not replace a full DBMS for all data requirements [795e6e5d-cfbd-4ef1-9ab2-62549da54d5b].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "difference between DBMS and Redis for data storage"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "DBMS data storage"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis data storage"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 4655,
+          "outputTokens": 601,
+          "embeddingTokens": 16,
+          "costUsd": 0.0010609299999999999,
+          "latencyMs": 8458,
+          "stoppedBy": null,
+          "citations": [
+            "2eb1f2fe-1aa2-449d-8356-d9820ee8efd7",
+            "3cad5c5b-ff31-4d79-8f10-383364293898",
+            "4bc60bc6-51c6-4060-83fc-bb67eec9f8cc",
+            "795e6e5d-cfbd-4ef1-9ab2-62549da54d5b"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both DBMS and Redis, addressing their structures, use cases, durability, performance, and design features."
+        },
+        "pass": true
+      },
+      {
+        "id": "math-pure",
+        "category": "arithmetic",
+        "run": {
+          "path": "agent",
+          "question": "What is 48213 * 317 + 19?",
+          "answer": "The result of 48213 * 317 + 19 is 15,283,540.",
+          "toolCalls": [
+            {
+              "name": "calculate",
+              "args": {
+                "expression": "48213 * 317 + 19"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2237,
+          "outputTokens": 41,
+          "embeddingTokens": 0,
+          "costUsd": 0.00036015000000000005,
+          "latencyMs": 1993,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly calculates and formats the result."
+        },
+        "pass": true
+      },
+      {
+        "id": "math-pure",
+        "category": "arithmetic",
+        "run": {
+          "path": "agent",
+          "question": "What is 48213 * 317 + 19?",
+          "answer": "The result of 48213 * 317 + 19 is 15,283,540.",
+          "toolCalls": [
+            {
+              "name": "calculate",
+              "args": {
+                "expression": "48213 * 317 + 19"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2237,
+          "outputTokens": 41,
+          "embeddingTokens": 0,
+          "costUsd": 0.00036015000000000005,
+          "latencyMs": 1887,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly calculates and formats the result."
+        },
+        "pass": true
+      },
+      {
+        "id": "math-with-doc",
+        "category": "arithmetic",
+        "run": {
+          "path": "agent",
+          "question": "According to the document, can a partition in a Kafka consumer group be assigned to more than one consumer at a time? Then, if a topic has 12 partitions and the group has 4 consumers, how many partitions does each consumer get on average? Use the calculator for the arithmetic.",
+          "answer": "A partition in a Kafka consumer group cannot be assigned to more than one consumer at a time, as each partition is assigned to only one consumer within a group for parallel processing [fd04038f-7ec2-4e72-ac28-96bcb47633fe]. \n\nIf a topic has 12 partitions and the group has 4 consumers, each consumer would get an average of 3 partitions.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka consumer group partition assignment"
+              },
+              "isError": false
+            },
+            {
+              "name": "calculate",
+              "args": {
+                "expression": "12 / 4"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 3137,
+          "outputTokens": 135,
+          "embeddingTokens": 6,
+          "costUsd": 0.00055233,
+          "latencyMs": 3396,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly states that a partition is assigned to only one consumer at a time and calculates the average partitions per consumer."
+        },
+        "pass": true
+      },
+      {
+        "id": "math-with-doc",
+        "category": "arithmetic",
+        "run": {
+          "path": "agent",
+          "question": "According to the document, can a partition in a Kafka consumer group be assigned to more than one consumer at a time? Then, if a topic has 12 partitions and the group has 4 consumers, how many partitions does each consumer get on average? Use the calculator for the arithmetic.",
+          "answer": "In a Kafka consumer group, each partition is assigned to only one consumer at a time, meaning no partition can be assigned to multiple consumers simultaneously [fd04038f-7ec2-4e72-ac28-96bcb47633fe]. \n\nIf a topic has 12 partitions and the group has 4 consumers, each consumer gets an average of 3 partitions.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka consumer group partition assignment"
+              },
+              "isError": false
+            },
+            {
+              "name": "calculate",
+              "args": {
+                "expression": "12 / 4"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 3137,
+          "outputTokens": 128,
+          "embeddingTokens": 6,
+          "costUsd": 0.00054813,
+          "latencyMs": 3842,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly states that a partition is assigned to only one consumer at a time and calculates the average partitions per consumer."
+        },
+        "pass": true
+      },
+      {
+        "id": "list-docs",
+        "category": "list",
+        "run": {
+          "path": "agent",
+          "question": "Which documents do you have?",
+          "answer": "I have one document titled \"school.pdf,\" which contains the following sections: DBMS, Redis, AI, Java, n8n, and Kafka.",
+          "toolCalls": [
+            {
+              "name": "list_documents",
+              "args": {},
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2269,
+          "outputTokens": 42,
+          "embeddingTokens": 0,
+          "costUsd": 0.00036554999999999997,
+          "latencyMs": 2106,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly states it has 'school.pdf' and mentions the number of sections."
+        },
+        "pass": true
+      },
+      {
+        "id": "list-docs",
+        "category": "list",
+        "run": {
+          "path": "agent",
+          "question": "Which documents do you have?",
+          "answer": "I have one document titled \"school.pdf,\" which includes the following sections: DBMS, Redis, AI, Java, n8n, and Kafka.",
+          "toolCalls": [
+            {
+              "name": "list_documents",
+              "args": {},
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2269,
+          "outputTokens": 42,
+          "embeddingTokens": 0,
+          "costUsd": 0.00036554999999999997,
+          "latencyMs": 1859,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly states it has 'school.pdf' and mentions the number of sections."
+        },
+        "pass": true
+      },
+      {
+        "id": "list-topics",
+        "category": "list",
+        "run": {
+          "path": "agent",
+          "question": "What topics does the document cover?",
+          "answer": "The document covers the following topics: DBMS, Redis, AI, Java, n8n, and Kafka.",
+          "toolCalls": [
+            {
+              "name": "list_documents",
+              "args": {},
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2271,
+          "outputTokens": 34,
+          "embeddingTokens": 0,
+          "costUsd": 0.00036104999999999997,
+          "latencyMs": 2576,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer names all the required topics."
+        },
+        "pass": true
+      },
+      {
+        "id": "list-topics",
+        "category": "list",
+        "run": {
+          "path": "agent",
+          "question": "What topics does the document cover?",
+          "answer": "The document covers the following topics: DBMS, Redis, AI, Java, n8n, and Kafka.",
+          "toolCalls": [
+            {
+              "name": "list_documents",
+              "args": {},
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2271,
+          "outputTokens": 34,
+          "embeddingTokens": 0,
+          "costUsd": 0.00036104999999999997,
+          "latencyMs": 5089,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer names all the required topics."
+        },
+        "pass": true
+      },
+      {
+        "id": "datetime",
+        "category": "datetime",
+        "run": {
+          "path": "agent",
+          "question": "What day of the week is it today?",
+          "answer": "Today is Wednesday.",
+          "toolCalls": [
+            {
+              "name": "get_current_datetime",
+              "args": {},
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2259,
+          "outputTokens": 16,
+          "embeddingTokens": 0,
+          "costUsd": 0.00034845,
+          "latencyMs": 1807,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly names the weekday as Wednesday."
+        },
+        "pass": true
+      },
+      {
+        "id": "datetime",
+        "category": "datetime",
+        "run": {
+          "path": "agent",
+          "question": "What day of the week is it today?",
+          "answer": "Today is Wednesday.",
+          "toolCalls": [
+            {
+              "name": "get_current_datetime",
+              "args": {},
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2259,
+          "outputTokens": 16,
+          "embeddingTokens": 0,
+          "costUsd": 0.00034845,
+          "latencyMs": 1818,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly names the weekday as Wednesday."
+        },
+        "pass": true
+      },
+      {
+        "id": "unanswerable-penguins",
+        "category": "unanswerable",
+        "run": {
+          "path": "agent",
+          "question": "What does the document say about quantum teleportation of penguins?",
+          "answer": "The documents do not seem to cover the topic of \"quantum teleportation of penguins.\"",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "quantum teleportation of penguins"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2955,
+          "outputTokens": 40,
+          "embeddingTokens": 7,
+          "costUsd": 0.00046816,
+          "latencyMs": 2539,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer honestly states that the document does not cover the topic."
+        },
+        "pass": true
+      },
+      {
+        "id": "unanswerable-penguins",
+        "category": "unanswerable",
+        "run": {
+          "path": "agent",
+          "question": "What does the document say about quantum teleportation of penguins?",
+          "answer": "The documents do not seem to cover quantum teleportation of penguins or related topics.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "quantum teleportation of penguins"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "quantum teleportation"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 3,
+          "chatCalls": 3,
+          "inputTokens": 5589,
+          "outputTokens": 55,
+          "embeddingTokens": 11,
+          "costUsd": 0.00087278,
+          "latencyMs": 4151,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer honestly states that the document does not cover the topic."
+        },
+        "pass": true
+      },
+      {
+        "id": "unanswerable-salary",
+        "category": "unanswerable",
+        "run": {
+          "path": "agent",
+          "question": "What is the salary policy described in the document?",
+          "answer": "The documents do not seem to cover the salary policy.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "salary policy"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "employee compensation policy"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "compensation structure policy"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8881,
+          "outputTokens": 60,
+          "embeddingTokens": 9,
+          "costUsd": 0.0013693199999999998,
+          "latencyMs": 5266,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer honestly states that the documents do not cover a salary policy."
+        },
+        "pass": true
+      },
+      {
+        "id": "unanswerable-salary",
+        "category": "unanswerable",
+        "run": {
+          "path": "agent",
+          "question": "What is the salary policy described in the document?",
+          "answer": "The documents do not seem to cover any details about the salary policy.",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "salary policy"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "compensation policy"
+              },
+              "isError": false
+            },
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "salary structure"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 4,
+          "chatCalls": 4,
+          "inputTokens": 8856,
+          "outputTokens": 61,
+          "embeddingTokens": 7,
+          "costUsd": 0.0013659099999999997,
+          "latencyMs": 6525,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer honestly states that the documents do not cover a salary policy."
+        },
+        "pass": true
+      },
+      {
+        "id": "follow-up",
+        "category": "follow-up",
+        "run": {
+          "path": "agent",
+          "question": "How do consumer groups work in it?",
+          "answer": "Consumer groups in Kafka allow multiple consumers to read from a topic's partitions in parallel, with each partition assigned to only one consumer at a time within the group. Different consumer groups can independently consume the same events, as Kafka tracks offsets separately for each group, enabling multiple applications to process the same event concurrently [fd04038f-7ec2-4e72-ac28-96bcb47633fe].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "consumer groups in Kafka"
+              },
+              "isError": false
+            },
+            {
+              "name": "get_chunk",
+              "args": {
+                "chunkId": "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 3,
+          "chatCalls": 3,
+          "inputTokens": 5295,
+          "outputTokens": 136,
+          "embeddingTokens": 4,
+          "costUsd": 0.00087637,
+          "latencyMs": 4253,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains how Kafka consumer groups work, including partition assignment and independent consumption."
+        },
+        "pass": true
+      },
+      {
+        "id": "follow-up",
+        "category": "follow-up",
+        "run": {
+          "path": "agent",
+          "question": "How do consumer groups work in it?",
+          "answer": "In Kafka, consumer groups allow multiple consumers to share the workload of reading from topic partitions. Each partition is assigned to only one consumer in a group at any given time, enabling parallel processing. Different consumer groups can read the same events independently since Kafka tracks offsets separately for each group [fd04038f-7ec2-4e72-ac28-96bcb47633fe].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Kafka consumer groups"
+              },
+              "isError": false
+            },
+            {
+              "name": "get_chunk",
+              "args": {
+                "chunkId": "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 3,
+          "chatCalls": 3,
+          "inputTokens": 5293,
+          "outputTokens": 130,
+          "embeddingTokens": 4,
+          "costUsd": 0.0008724699999999999,
+          "latencyMs": 3985,
+          "stoppedBy": null,
+          "citations": [
+            "fd04038f-7ec2-4e72-ac28-96bcb47633fe"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains how Kafka consumer groups work, including partition assignment and independent consumption."
+        },
+        "pass": true
+      },
+      {
+        "id": "format-one-line",
+        "category": "format",
+        "run": {
+          "path": "agent",
+          "question": "In one line, what is Redis?",
+          "answer": "Redis is an in-memory data store used for caching, session storage, and fast temporary data access, supporting various data structures like strings and hashes [3cad5c5b-ff31-4d79-8f10-383364293898].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis definition"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2947,
+          "outputTokens": 68,
+          "embeddingTokens": 2,
+          "costUsd": 0.00048311,
+          "latencyMs": 2584,
+          "stoppedBy": null,
+          "citations": [
+            "3cad5c5b-ff31-4d79-8f10-383364293898"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer is not a single short sentence as it includes additional details."
+        },
+        "pass": false
+      },
+      {
+        "id": "format-one-line",
+        "category": "format",
+        "run": {
+          "path": "agent",
+          "question": "In one line, what is Redis?",
+          "answer": "Redis is an in-memory data store used for caching, session storage, and fast data access, supporting various data structures like strings and hashes [3cad5c5b-ff31-4d79-8f10-383364293898].",
+          "toolCalls": [
+            {
+              "name": "search_documents",
+              "args": {
+                "query": "Redis"
+              },
+              "isError": false
+            }
+          ],
+          "steps": 2,
+          "chatCalls": 2,
+          "inputTokens": 2946,
+          "outputTokens": 66,
+          "embeddingTokens": 1,
+          "costUsd": 0.00048163,
+          "latencyMs": 2774,
+          "stoppedBy": null,
+          "citations": [
+            "3cad5c5b-ff31-4d79-8f10-383364293898"
+          ]
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer is not a single short sentence as it includes additional details."
+        },
+        "pass": false
+      }
+    ]
+  },
+  "classic": {
+    "summary": {
+      "label": "CLASSIC RAG",
+      "n": 34,
+      "taskSuccess": 0.5882352941176471,
+      "toolBehaviourOk": 0.9411764705882353,
+      "answerOk": 0.5882352941176471,
+      "meanSteps": 1,
+      "meanToolCalls": 0,
+      "meanChatTokens": 2617.0882352941176,
+      "meanEmbeddingTokens": 10.058823529411764,
+      "meanCostUsd": 0.0004375870588235294,
+      "meanLatencyMs": 2739.1176470588234
+    },
+    "outcomes": [
+      {
+        "id": "greet-1",
+        "category": "greeting",
+        "run": {
+          "path": "classic",
+          "question": "Hi there!",
+          "answer": "Hi! I'm doing well, thanks for asking! How can I assist you today?",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2665,
+          "outputTokens": 35,
+          "embeddingTokens": 3,
+          "costUsd": 0.00042114,
+          "latencyMs": 2321,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer provides a brief, polite greeting and offers assistance."
+        },
+        "pass": true
+      },
+      {
+        "id": "greet-1",
+        "category": "greeting",
+        "run": {
+          "path": "classic",
+          "question": "Hi there!",
+          "answer": "Hi! I'm doing well, thanks for asking! How about you? \n\nIf you have any questions or need information about n8n, AI, or Redis, feel free to ask!",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2665,
+          "outputTokens": 56,
+          "embeddingTokens": 3,
+          "costUsd": 0.00043374000000000006,
+          "latencyMs": 2353,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer provides a polite greeting and offers help without stating specific facts."
+        },
+        "pass": true
+      },
+      {
+        "id": "greet-2",
+        "category": "greeting",
+        "run": {
+          "path": "classic",
+          "question": "Thanks, that's helpful.",
+          "answer": "",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 1,
+          "inputTokens": 1642,
+          "outputTokens": 16,
+          "embeddingTokens": 0,
+          "costUsd": 0.0002559,
+          "latencyMs": 1116,
+          "stoppedBy": null,
+          "citations": [],
+          "error": "Something went wrong"
+        },
+        "toolFailures": [
+          "Something went wrong"
+        ],
+        "verdict": {
+          "pass": false,
+          "reason": "empty answer"
+        },
+        "pass": false
+      },
+      {
+        "id": "greet-2",
+        "category": "greeting",
+        "run": {
+          "path": "classic",
+          "question": "Thanks, that's helpful.",
+          "answer": "",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 1,
+          "inputTokens": 1642,
+          "outputTokens": 16,
+          "embeddingTokens": 0,
+          "costUsd": 0.0002559,
+          "latencyMs": 1098,
+          "stoppedBy": null,
+          "citations": [],
+          "error": "Something went wrong"
+        },
+        "toolFailures": [
+          "Something went wrong"
+        ],
+        "verdict": {
+          "pass": false,
+          "reason": "empty answer"
+        },
+        "pass": false
+      },
+      {
+        "id": "single-kafka",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "What is Kafka?",
+          "answer": "Kafka is a distributed event-streaming platform designed to reliably handle large volumes of events. It allows producers to publish events to topics, and consumers can read those events independently, enabling asynchronous communication and reducing direct coupling between services. Kafka topics are divided into partitions, which consist of ordered sequences of records. This partitioning allows different consumers to process events in parallel. Kafka also supports multiple consumer groups, enabling independent processing of the same event by different applications. It is important to note that Kafka functions as a durable event log rather than a simple queue, accommodating complex behaviors like offsets, retention, replication, and exactly-once processing.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2564,
+          "outputTokens": 143,
+          "embeddingTokens": 4,
+          "costUsd": 0.00047092,
+          "latencyMs": 3772,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly describes Kafka as a distributed event-streaming platform that handles large volumes of events reliably, including details about producers, consumers, and topics."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-kafka",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "What is Kafka?",
+          "answer": "Kafka is a distributed event-streaming platform designed to handle large volumes of events reliably. It enables producers to publish events to topics, while consumers read those events independently, facilitating asynchronous communication between components and reducing direct coupling between services. \n\nKafka topics are divided into partitions, with each partition being an ordered sequence of records. This partitioning allows for scaling, as different consumers can process different partitions in parallel. Consumer groups can independently consume the same event, tracking offsets separately for each group. \n\nProducers can configure acknowledgements to control how much broker confirmation is needed, and can also use idempotence to prevent duplicate records from retry attempts. Additional concepts related to Kafka include offsets, retention, replication, consumer rebalancing, and exactly-once processing, making it a durable event log that supports multiple independent consumers processing the same stream of events.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2564,
+          "outputTokens": 187,
+          "embeddingTokens": 4,
+          "costUsd": 0.0004973199999999999,
+          "latencyMs": 2941,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly describes Kafka as a distributed event-streaming platform that handles large volumes of events reliably, including details about producers, topics, and consumers."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-redis-rank",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "Which Redis data structure would you use to implement a ranking system?",
+          "answer": "You would use sorted sets in Redis to implement a ranking system. Sorted sets are particularly suited for ranking because they maintain a unique score associated with each value, allowing easy retrieval and sorting based on those scores.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2519,
+          "outputTokens": 69,
+          "embeddingTokens": 13,
+          "costUsd": 0.0004209399999999999,
+          "latencyMs": 2515,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly identifies sorted sets as the data structure for a ranking system."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-redis-rank",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "Which Redis data structure would you use to implement a ranking system?",
+          "answer": "You would use sorted sets to implement a ranking system in Redis. Sorted sets are specifically designed for this purpose, allowing you to maintain an ordered list of elements based on their scores.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2519,
+          "outputTokens": 64,
+          "embeddingTokens": 13,
+          "costUsd": 0.00041793999999999995,
+          "latencyMs": 2134,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly identifies sorted sets as the data structure for a ranking system."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-ttl",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "What are TTLs used for in Redis caching?",
+          "answer": "TTLs, or expiration times, in Redis caching are used to prevent cached data from remaining indefinitely. They help manage the lifecycle of cached data by specifying how long a value should be stored in Redis before it expires and is removed. This ensures that the cached data is refreshed and relevant to current needs.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2576,
+          "outputTokens": 85,
+          "embeddingTokens": 10,
+          "costUsd": 0.00043869999999999993,
+          "latencyMs": 2465,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains that TTLs prevent cached data from remaining indefinitely."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-ttl",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "What are TTLs used for in Redis caching?",
+          "answer": "In Redis caching, TTLs, or expiration times, are used to prevent cached data from remaining indefinitely. This means that if a value is stored in Redis for caching purposes, it will automatically expire after a set period, ensuring that the cache does not grow uncontrollably and that outdated information is not served. This helps in maintaining the relevance and freshness of the cached data.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2576,
+          "outputTokens": 100,
+          "embeddingTokens": 10,
+          "costUsd": 0.00044769999999999993,
+          "latencyMs": 2850,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains that TTLs prevent cached data from remaining indefinitely."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-groups",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "Can two different Kafka consumer groups consume the same event?",
+          "answer": "Yes, two different Kafka consumer groups can consume the same event independently. Kafka tracks offsets separately for each group, allowing multiple independent applications to process the same event.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2578,
+          "outputTokens": 58,
+          "embeddingTokens": 11,
+          "costUsd": 0.00042293,
+          "latencyMs": 2228,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains that Kafka tracks offsets separately for each consumer group."
+        },
+        "pass": true
+      },
+      {
+        "id": "single-groups",
+        "category": "single",
+        "run": {
+          "path": "classic",
+          "question": "Can two different Kafka consumer groups consume the same event?",
+          "answer": "Yes, two different Kafka consumer groups can independently consume the same event. Kafka tracks offsets separately for each group, which allows one event to be processed by multiple independent applications.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2578,
+          "outputTokens": 60,
+          "embeddingTokens": 11,
+          "costUsd": 0.00042413,
+          "latencyMs": 2520,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains that Kafka tracks offsets separately for each consumer group."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-redis-kafka",
+        "category": "comparison",
+        "run": {
+          "path": "classic",
+          "question": "Compare Redis and Kafka.",
+          "answer": "Redis and Kafka serve different purposes in the realm of data management and messaging.\n\nRedis is primarily an in-memory data store that excels at low-latency operations and is commonly used for caching, session storage, counters, distributed coordination, and fast temporary data access. It supports various data structures such as strings, hashes, lists, sets, and sorted sets, each tailored for different use cases. For instance, Redis is often used to cache frequently requested data to avoid repeated queries to a database.\n\nOn the other hand, Kafka is a distributed event-streaming platform designed for handling large volumes of events reliably. It allows producers to publish events to topics and consumers to read those events independently, facilitating asynchronous communication between components. Kafka organizes events into topics and partitions, where each partition is an ordered sequence of records, enabling scalability and parallel processing by multiple consumers.\n\nWhile Redis focuses on fast access and temporary data storage, Kafka is oriented towards managing streams of events with durability and independent consumption by different applications. Consequently, Redis is more suited for situations requiring quick data retrieval and caching, whereas Kafka is ideal for scenarios involving event-driven architectures and reliable processing of event streams.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2566,
+          "outputTokens": 249,
+          "embeddingTokens": 5,
+          "costUsd": 0.00053495,
+          "latencyMs": 4518,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both Redis and Kafka, detailing their distinct purposes and functionalities."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-redis-kafka",
+        "category": "comparison",
+        "run": {
+          "path": "classic",
+          "question": "Compare Redis and Kafka.",
+          "answer": "Redis and Kafka serve different purposes in data handling within distributed systems. \n\nRedis is primarily an in-memory data store known for its high-speed operations, making it ideal for caching, session storage, counters, and fast temporary data access. It supports various data structures, such as strings, hashes, lists, sets, and sorted sets, each suitable for different types of problems. Redis is designed for low-latency operations and can be used for scenarios like rate limiting and lightweight coordination among services. However, it's important to remember that Redis should not replace a traditional database due to its specific durability and consistency characteristics.\n\nOn the other hand, Kafka is a distributed event-streaming platform aimed at managing large volumes of events reliably. It allows producers to publish events to topics, which consumers can then read independently, enabling asynchronous communication and reducing direct coupling between services. Kafka's architecture includes partitions for scalability, allowing multiple consumers to process data in parallel. It tracks offsets for different consumer groups, enabling multiple applications to independently consume the same events.\n\nIn summary, Redis excels at quick data storage and retrieval while Kafka focuses on event streaming and message communication management. Each tool has its own strengths tailored to specific use cases in distributed applications.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2566,
+          "outputTokens": 261,
+          "embeddingTokens": 5,
+          "costUsd": 0.00054215,
+          "latencyMs": 4245,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both Redis and Kafka, detailing their purposes and characteristics."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-dbms-redis",
+        "category": "comparison",
+        "run": {
+          "path": "classic",
+          "question": "How do a DBMS and Redis differ for storing data, based on the documents?",
+          "answer": "Based on the documents, a Database Management System (DBMS) is designed to store, organize, retrieve, update, and manage data with a focus on durability and consistency. Common relational databases like MySQL, PostgreSQL, and Oracle organize information into tables with rows and columns, utilizing relationships represented through keys. DBMS concepts include transactions that adhere to the ACID properties and use SQL for interactions.\n\nIn contrast, Redis is an in-memory data store primarily used for caching, session storage, and fast temporary data access. It supports various data structures like strings, hashes, and sets, optimized for low-latency operations. While Redis can be utilized within distributed systems and implement features like caching strategies and counters, it should not automatically replace a database due to differing requirements of durability, consistency, and access. Redis is more focused on providing rapid access to frequently requested data rather than on long-term data storage and management. \n\nIn summary, while a DBMS focuses on structured data management and durability, Redis is geared towards speed and temporary data access, often serving as a complement to traditional databases.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2524,
+          "outputTokens": 249,
+          "embeddingTokens": 12,
+          "costUsd": 0.00052956,
+          "latencyMs": 4454,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both DBMS and Redis, detailing their characteristics and differences."
+        },
+        "pass": true
+      },
+      {
+        "id": "compare-dbms-redis",
+        "category": "comparison",
+        "run": {
+          "path": "classic",
+          "question": "How do a DBMS and Redis differ for storing data, based on the documents?",
+          "answer": "A Database Management System (DBMS) and Redis differ significantly in their approaches to storing data. \n\nA DBMS, such as MySQL or PostgreSQL, organizes data into tables with relationships represented by keys, and it uses SQL for data interaction. It follows ACID properties for transactions, ensuring atomicity, consistency, isolation, and durability. This makes DBMS suitable for applications requiring strong data integrity and complex queries.\n\nOn the other hand, Redis is an in-memory data store primarily used for fast temporary data access and caching. It supports various data structures like strings, hashes, and sets but does not automatically replace a traditional database due to its lower durability and consistency guarantees. Redis provides low-latency operations and is often used for caching frequently requested data to improve performance.\n\nIn summary, while a DBMS focuses on structured, persistent data storage with robust transaction support, Redis emphasizes speed and efficiency for transient data storage and caching in distributed systems.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2524,
+          "outputTokens": 220,
+          "embeddingTokens": 12,
+          "costUsd": 0.0005121599999999999,
+          "latencyMs": 3835,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer covers both DBMS and Redis, detailing their characteristics and differences."
+        },
+        "pass": true
+      },
+      {
+        "id": "math-pure",
+        "category": "arithmetic",
+        "run": {
+          "path": "classic",
+          "question": "What is 48213 * 317 + 19?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2595,
+          "outputTokens": 36,
+          "embeddingTokens": 12,
+          "costUsd": 0.00041241000000000004,
+          "latencyMs": 2488,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not provide the correct calculation."
+        },
+        "pass": false
+      },
+      {
+        "id": "math-pure",
+        "category": "arithmetic",
+        "run": {
+          "path": "classic",
+          "question": "What is 48213 * 317 + 19?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2595,
+          "outputTokens": 36,
+          "embeddingTokens": 12,
+          "costUsd": 0.00041241000000000004,
+          "latencyMs": 2062,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not provide the correct calculation."
+        },
+        "pass": false
+      },
+      {
+        "id": "math-with-doc",
+        "category": "arithmetic",
+        "run": {
+          "path": "classic",
+          "question": "According to the document, can a partition in a Kafka consumer group be assigned to more than one consumer at a time? Then, if a topic has 12 partitions and the group has 4 consumers, how many partitions does each consumer get on average? Use the calculator for the arithmetic.",
+          "answer": "According to the document, a partition in a Kafka consumer group cannot be assigned to more than one consumer at a time. Each partition is assigned to only one consumer within a consumer group.\n\nIf a topic has 12 partitions and the group has 4 consumers, we can calculate the average number of partitions per consumer as follows:\n\n12 partitions ÷ 4 consumers = 3 partitions per consumer.\n\nOn average, each consumer in the group would get 3 partitions.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2558,
+          "outputTokens": 158,
+          "embeddingTokens": 44,
+          "costUsd": 0.00048422,
+          "latencyMs": 3557,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly states that a partition is assigned to only one consumer at a time and calculates the average partitions per consumer accurately."
+        },
+        "pass": true
+      },
+      {
+        "id": "math-with-doc",
+        "category": "arithmetic",
+        "run": {
+          "path": "classic",
+          "question": "According to the document, can a partition in a Kafka consumer group be assigned to more than one consumer at a time? Then, if a topic has 12 partitions and the group has 4 consumers, how many partitions does each consumer get on average? Use the calculator for the arithmetic.",
+          "answer": "No, a partition in a Kafka consumer group cannot be assigned to more than one consumer at a time. Within a consumer group, each partition is assigned to only one consumer simultaneously.\n\nIf a topic has 12 partitions and the group has 4 consumers, we can calculate the average number of partitions per consumer as follows:\n\n12 partitions / 4 consumers = 3 partitions per consumer on average.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2558,
+          "outputTokens": 144,
+          "embeddingTokens": 44,
+          "costUsd": 0.00047582,
+          "latencyMs": 3370,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly states that a partition is assigned to only one consumer at a time and calculates the average partitions per consumer accurately."
+        },
+        "pass": true
+      },
+      {
+        "id": "list-docs",
+        "category": "list",
+        "run": {
+          "path": "classic",
+          "question": "Which documents do you have?",
+          "answer": "I have three documents. The first document discusses Database Management Systems (DBMS), covering topics such as replication, partitioning, and the importance of understanding SQL versus NoSQL. The second document also focuses on DBMS, detailing its definition, common relational databases, key concepts like primary and foreign keys, transactions, and indexes. The third document is about AI, explaining how application developers can start learning about AI models, embeddings, vector databases, and their integration with backend systems.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2492,
+          "outputTokens": 116,
+          "embeddingTokens": 6,
+          "costUsd": 0.00044417999999999997,
+          "latencyMs": 3027,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not mention 'school.pdf'."
+        },
+        "pass": false
+      },
+      {
+        "id": "list-docs",
+        "category": "list",
+        "run": {
+          "path": "classic",
+          "question": "Which documents do you have?",
+          "answer": "I have three documents. The first two are about Database Management Systems (DBMS), covering topics such as the functions of a DBMS, relational databases, important concepts like keys and transactions, and various techniques for system design. The third document discusses AI, including how to use AI models, components like embeddings and vector databases, and areas of learning in AI applications.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2492,
+          "outputTokens": 94,
+          "embeddingTokens": 6,
+          "costUsd": 0.00043097999999999997,
+          "latencyMs": 2776,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not mention 'school.pdf'."
+        },
+        "pass": false
+      },
+      {
+        "id": "list-topics",
+        "category": "list",
+        "run": {
+          "path": "classic",
+          "question": "What topics does the document cover?",
+          "answer": "The document covers two main topics: Apache Kafka and Artificial Intelligence (AI). \n\nFor Kafka, it discusses its role as a distributed event-streaming platform, how producers and consumers interact with events, the concept of topics and partitions, consumer groups, and various operational aspects like acknowledgements and idempotence.\n\nRegarding AI, it addresses practical applications for developers, the importance of understanding AI models, concepts like embeddings and vector databases, machine learning fundamentals, and the influence of neural networks and Large Language Models (LLMs) in modern AI.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2594,
+          "outputTokens": 129,
+          "embeddingTokens": 7,
+          "costUsd": 0.00046740999999999997,
+          "latencyMs": 3639,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer only mentions Kafka and AI, missing other required topics."
+        },
+        "pass": false
+      },
+      {
+        "id": "list-topics",
+        "category": "list",
+        "run": {
+          "path": "classic",
+          "question": "What topics does the document cover?",
+          "answer": "The document covers two main topics: Apache Kafka and Artificial Intelligence (AI). \n\nIn the Kafka section, it discusses the features of Kafka as a distributed event-streaming platform, including topics, partitions, consumer groups, producer configurations, and other important concepts like offsets and delivery semantics.\n\nIn the AI section, it addresses the basics of AI for application developers, including topics like AI models, APIs, embeddings, vector databases, machine learning fundamentals, neural networks, and Large Language Models (LLMs), as well as practical applications and architectural considerations for integrating AI into existing systems.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2594,
+          "outputTokens": 136,
+          "embeddingTokens": 7,
+          "costUsd": 0.00047160999999999997,
+          "latencyMs": 3097,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer only mentions Kafka and AI, missing other required topics."
+        },
+        "pass": false
+      },
+      {
+        "id": "datetime",
+        "category": "datetime",
+        "run": {
+          "path": "classic",
+          "question": "What day of the week is it today?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2620,
+          "outputTokens": 33,
+          "embeddingTokens": 9,
+          "costUsd": 0.00041397,
+          "latencyMs": 1890,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not name the weekday as required."
+        },
+        "pass": false
+      },
+      {
+        "id": "datetime",
+        "category": "datetime",
+        "run": {
+          "path": "classic",
+          "question": "What day of the week is it today?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2620,
+          "outputTokens": 33,
+          "embeddingTokens": 9,
+          "costUsd": 0.00041397,
+          "latencyMs": 1970,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not name the weekday as required."
+        },
+        "pass": false
+      },
+      {
+        "id": "unanswerable-penguins",
+        "category": "unanswerable",
+        "run": {
+          "path": "classic",
+          "question": "What does the document say about quantum teleportation of penguins?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2592,
+          "outputTokens": 37,
+          "embeddingTokens": 13,
+          "costUsd": 0.00041269,
+          "latencyMs": 2165,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer honestly states that the document does not cover the topic."
+        },
+        "pass": true
+      },
+      {
+        "id": "unanswerable-penguins",
+        "category": "unanswerable",
+        "run": {
+          "path": "classic",
+          "question": "What does the document say about quantum teleportation of penguins?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2592,
+          "outputTokens": 37,
+          "embeddingTokens": 13,
+          "costUsd": 0.00041269,
+          "latencyMs": 2447,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer honestly states that the document does not cover the topic."
+        },
+        "pass": true
+      },
+      {
+        "id": "unanswerable-salary",
+        "category": "unanswerable",
+        "run": {
+          "path": "classic",
+          "question": "What is the salary policy described in the document?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2639,
+          "outputTokens": 34,
+          "embeddingTokens": 10,
+          "costUsd": 0.00041754999999999993,
+          "latencyMs": 2388,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not honestly state that the document does not cover a salary policy."
+        },
+        "pass": false
+      },
+      {
+        "id": "unanswerable-salary",
+        "category": "unanswerable",
+        "run": {
+          "path": "classic",
+          "question": "What is the salary policy described in the document?",
+          "answer": "I couldn't find the answer in the document.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2639,
+          "outputTokens": 34,
+          "embeddingTokens": 10,
+          "costUsd": 0.00041754999999999993,
+          "latencyMs": 2102,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer does not honestly state that the document does not cover a salary policy."
+        },
+        "pass": false
+      },
+      {
+        "id": "follow-up",
+        "category": "follow-up",
+        "run": {
+          "path": "classic",
+          "question": "How do consumer groups work in it?",
+          "answer": "In Kafka, consumer groups play a crucial role in processing messages. Each consumer group can independently consume events from the same topic. Kafka tracks offsets separately for each consumer group, which allows multiple independent applications to process the same event. \n\nWithin a consumer group, each partition of a topic is assigned to only one consumer at a time. This means that if a topic has multiple partitions and a consumer group has several active consumers, the workload can be processed in parallel, enhancing throughput. Overall, consumer groups enable asynchronous communication and reduce direct coupling between services by allowing independent consumption of records.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2608,
+          "outputTokens": 138,
+          "embeddingTokens": 8,
+          "costUsd": 0.00047504,
+          "latencyMs": 2975,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains how consumer groups work in Kafka, including partition assignment and independent consumption."
+        },
+        "pass": true
+      },
+      {
+        "id": "follow-up",
+        "category": "follow-up",
+        "run": {
+          "path": "classic",
+          "question": "How do consumer groups work in it?",
+          "answer": "Consumer groups in Kafka are essential for managing how events are consumed from topics. Each partition in a Kafka topic is assigned to only one consumer within a consumer group at a time, which allows for load balancing and parallel processing of messages. If a topic has multiple partitions and a consumer group has an equal number of active consumers, the workload can be processed simultaneously across those consumers.\n\nAdditionally, different consumer groups can independently consume the same event because Kafka keeps track of offsets separately for each group. This means that one event can be processed by multiple independent applications, allowing for flexibility and scalability in how the data is utilized.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2608,
+          "outputTokens": 144,
+          "embeddingTokens": 8,
+          "costUsd": 0.00047863999999999996,
+          "latencyMs": 3189,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": true,
+          "reason": "The answer correctly explains the assignment of partitions to consumers within a group and the independence of different consumer groups."
+        },
+        "pass": true
+      },
+      {
+        "id": "format-one-line",
+        "category": "format",
+        "run": {
+          "path": "classic",
+          "question": "In one line, what is Redis?",
+          "answer": "Redis is an in-memory data store used for caching, session storage, counters, distributed coordination, and fast temporary data access.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2507,
+          "outputTokens": 49,
+          "embeddingTokens": 4,
+          "costUsd": 0.00040596999999999996,
+          "latencyMs": 2271,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer is not a single short sentence as it includes multiple uses of Redis."
+        },
+        "pass": false
+      },
+      {
+        "id": "format-one-line",
+        "category": "format",
+        "run": {
+          "path": "classic",
+          "question": "In one line, what is Redis?",
+          "answer": "Redis is an in-memory data store commonly used for caching, session storage, counters, and fast temporary data access.",
+          "toolCalls": [],
+          "steps": 1,
+          "chatCalls": 2,
+          "inputTokens": 2507,
+          "outputTokens": 47,
+          "embeddingTokens": 4,
+          "costUsd": 0.00040477,
+          "latencyMs": 2352,
+          "stoppedBy": null,
+          "citations": []
+        },
+        "toolFailures": [],
+        "verdict": {
+          "pass": false,
+          "reason": "The answer is longer than one line."
+        },
+        "pass": false
+      }
+    ]
+  }
+}

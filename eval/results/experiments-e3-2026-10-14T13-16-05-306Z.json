@@ -1,0 +1,124 @@
+{
+  "createdAt": "2026-10-14T13:16:05.304Z",
+  "repeat": 3,
+  "results": {
+    "e3": [
+      {
+        "budget": "default budgets",
+        "question": "What is Kafka?",
+        "searches": [
+          1,
+          1,
+          1
+        ],
+        "steps": [
+          2,
+          2,
+          2
+        ],
+        "stoppedBy": [
+          null,
+          null,
+          null
+        ],
+        "honest": [
+          true,
+          true,
+          true
+        ],
+        "answers": [
+          "The documents do not seem to cover the topic of Kafka.",
+          "The documents do not seem to cover the topic of Kafka.",
+          "The documents do not seem to cover the topic of Kafka."
+        ]
+      },
+      {
+        "budget": "default budgets",
+        "question": "Compare Java and Kafka.",
+        "searches": [
+          2,
+          2,
+          2
+        ],
+        "steps": [
+          2,
+          2,
+          2
+        ],
+        "stoppedBy": [
+          null,
+          null,
+          null
+        ],
+        "honest": [
+          true,
+          true,
+          true
+        ],
+        "answers": [
+          "The documents do not seem to cover topics related to Java or Kafka.",
+          "The documents do not seem to cover comparisons between Java and Kafka.",
+          "The documents do not seem to cover comparisons between Java and Kafka."
+        ]
+      },
+      {
+        "budget": "generous budgets (20 steps, 30 tool calls)",
+        "question": "What is Kafka?",
+        "searches": [
+          1,
+          1,
+          1
+        ],
+        "steps": [
+          2,
+          2,
+          2
+        ],
+        "stoppedBy": [
+          null,
+          null,
+          null
+        ],
+        "honest": [
+          true,
+          true,
+          true
+        ],
+        "answers": [
+          "The documents do not seem to cover the topic of Kafka.",
+          "The documents do not seem to cover Kafka.",
+          "The documents do not seem to cover Kafka."
+        ]
+      },
+      {
+        "budget": "generous budgets (20 steps, 30 tool calls)",
+        "question": "Compare Java and Kafka.",
+        "searches": [
+          2,
+          2,
+          2
+        ],
+        "steps": [
+          2,
+          2,
+          2
+        ],
+        "stoppedBy": [
+          null,
+          null,
+          null
+        ],
+        "honest": [
+          true,
+          false,
+          true
+        ],
+        "answers": [
+          "The documents do not seem to cover comparisons between Java and Kafka.",
+          "The documents do not seem to cover comparisons between Java and Kafka. Would you like to ask about something else?",
+          "The documents do not seem to cover Java or Kafka."
+        ]
+      }
+    ]
+  }
+}

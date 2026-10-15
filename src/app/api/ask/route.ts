@@ -1,19 +1,8 @@
-import "dotenv/config";
-
-import OpenAI from "openai";
-import { QdrantClient } from "@qdrant/js-client-rest";
+import { getOpenAI } from "@/lib/clients";
+import { CHAT_MODEL } from "@/lib/config";
 import { addMessage, getConversation } from "@/lib/conversation-memory";
 import { understandQuery } from "@/lib/query-understanding";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const qdrant = new QdrantClient({
-  url: process.env.QDRANT_URL!,
-});
-
-const COLLECTION_NAME = "rag_documents";
+import { searchPoints } from "@/lib/rag/retrieval";
 
 export async function POST(request: Request) {
   try {
@@ -50,25 +39,15 @@ export async function POST(request: Request) {
     );
     console.log("Query understanding:", understanding);
 
-    // 1. Create embedding for the question
-    const embeddingResponse = await openai.embeddings.create({
-      model: "text-embedding-3-large",
-      input: understanding.searchQuery,
-    });
+    // 1. Embed the question and search Qdrant
+    const { points, usage } = await searchPoints(
+      understanding.searchQuery,
+      3
+    );
+    const searchResult = { points };
 
-    console.log("Prompt Token : ", embeddingResponse.usage.prompt_tokens);
-    console.log("Total Toke : ", embeddingResponse.usage.total_tokens);
-
-    const questionEmbedding = embeddingResponse.data[0].embedding;
-
-    console.log("Question embedding created");
-
-    // 2. Search Qdrant
-    const searchResult = await qdrant.query(COLLECTION_NAME, {
-      query: questionEmbedding,
-      limit: 3,
-      with_payload: true,
-    });
+    console.log("Prompt Token : ", usage.promptTokens);
+    console.log("Total Toke : ", usage.totalTokens);
 
     console.log(
       searchResult.points.map((point) => ({
@@ -98,8 +77,8 @@ export async function POST(request: Request) {
         .join("\n\n");
 
     // 4. Ask the LLM to answer using the retrieved context
-    const response = await openai.chat.completions.create({
-  model: "gpt-4o-mini",
+    const response = await getOpenAI().chat.completions.create({
+  model: CHAT_MODEL,
   messages: [
     {
       role: "system",

@@ -1,0 +1,26 @@
+{
+  "createdAt": "2026-10-14T13:13:27.080Z",
+  "repeat": 3,
+  "results": {
+    "e2": [
+      {
+        "variant": "baseline (full descriptions)",
+        "correct": 12,
+        "total": 12,
+        "misses": []
+      },
+      {
+        "variant": "A: empty descriptions",
+        "correct": 12,
+        "total": 12,
+        "misses": []
+      },
+      {
+        "variant": "B: empty descriptions + names t1..t5 + generic prompt",
+        "correct": 12,
+        "total": 12,
+        "misses": []
+      }
+    ]
+  }
+}

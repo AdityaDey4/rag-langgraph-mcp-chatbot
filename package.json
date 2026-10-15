@@ -10,7 +10,13 @@
     "embed": "tsx src/scripts/embed-and-store.ts",
     "test:qdrant": "tsx src/scripts/test-qdrant.ts",
     "setup:qdrant": "tsx src/scripts/setup-qdrant.ts",
-    "test:conversation": "tsx src/scripts/test-conversation.ts"
+    "test:conversation": "tsx src/scripts/test-conversation.ts",
+    "test:agent-tools": "tsx src/scripts/test-agent-tools.ts",
+    "test:agent-loop": "tsx src/scripts/test-agent-loop.ts",
+    "agent": "tsx src/scripts/agent-cli.ts",
+    "test:agent-sse": "tsx src/scripts/test-agent-sse.ts",
+    "agent:behaviour": "tsx src/scripts/agent-behaviour.ts",
+    "agent:experiments": "tsx src/scripts/agent-experiments.ts"
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.19.0",
@@ -19,7 +25,8 @@
     "next": "16.3.5",
     "openai": "^7.15.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

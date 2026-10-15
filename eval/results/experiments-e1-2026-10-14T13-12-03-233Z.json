@@ -1,0 +1,86 @@
+{
+  "createdAt": "2026-10-14T13:12:03.232Z",
+  "repeat": 3,
+  "results": {
+    "e1": {
+      "expected": 1587.30042857,
+      "rows": [
+        {
+          "maxSteps": 1,
+          "chainedCorrect": "2/3",
+          "chainedTools": [
+            "list_documents",
+            "list_documents",
+            "list_documents"
+          ],
+          "chainedStopped": [
+            "max_steps",
+            "max_steps",
+            "max_steps"
+          ],
+          "chainedAnswers": [
+            "There is 1 document with a total of 9 passages. To find the final number, I would calculate: \\( (9 \\times 1234.567) / 7 …",
+            "There is 1 document with 9 passages. Multiplying 9 by 1234.567 gives 11111.103, and dividing that by 7 results in approx…",
+            "There is 1 document with a total of 9 passages. Multiplying 9 by 1234.567 and then dividing by 7 gives approximately 158…"
+          ],
+          "comparisonOk": "3/3",
+          "comparisonStopped": [
+            "max_steps",
+            "max_steps",
+            "max_steps"
+          ]
+        },
+        {
+          "maxSteps": 2,
+          "chainedCorrect": "3/3",
+          "chainedTools": [
+            "list_documents+calculate",
+            "list_documents+calculate",
+            "list_documents+calculate"
+          ],
+          "chainedStopped": [
+            "max_steps",
+            "max_steps",
+            "max_steps"
+          ],
+          "chainedAnswers": [
+            "The final number, calculated from the count of passages, is approximately 1587.30.",
+            "The final number, after counting the passages and performing the calculations, is approximately 1587.30.",
+            "The final number, after counting the passages in the documents and performing the calculations, is approximately 1587.30…"
+          ],
+          "comparisonOk": "3/3",
+          "comparisonStopped": [
+            "max_steps",
+            "-",
+            "-"
+          ]
+        },
+        {
+          "maxSteps": 6,
+          "chainedCorrect": "3/3",
+          "chainedTools": [
+            "list_documents+calculate",
+            "list_documents+calculate",
+            "list_documents+calculate"
+          ],
+          "chainedStopped": [
+            "-",
+            "-",
+            "-"
+          ],
+          "chainedAnswers": [
+            "The final number is approximately 1587.30.",
+            "The final number is approximately 1587.30.",
+            "The final number is approximately 1587.30."
+          ],
+          "comparisonOk": "3/3",
+          "comparisonStopped": [
+            "-",
+            "-",
+            "-"
+          ]
+        }
+      ]
+    }
+  }
+}

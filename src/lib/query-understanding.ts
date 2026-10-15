@@ -1,8 +1,5 @@
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getOpenAI } from "./clients";
+import { CHAT_MODEL } from "./config";
 
 type Message = {
   role: "user" | "assistant";
@@ -18,8 +15,8 @@ export async function understandQuery(
   question: string,
   history: Message[]
 ): Promise<QueryUnderstandingResult> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const response = await getOpenAI().chat.completions.create({
+    model: CHAT_MODEL,
     response_format: {
       type: "json_object",
     },

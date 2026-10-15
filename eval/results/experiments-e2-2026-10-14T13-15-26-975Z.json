@@ -1,0 +1,41 @@
+{
+  "createdAt": "2026-10-14T13:15:26.975Z",
+  "repeat": 3,
+  "results": {
+    "e2": [
+      {
+        "variant": "baseline (full descriptions)",
+        "correct": 12,
+        "total": 12,
+        "misses": []
+      },
+      {
+        "variant": "A: empty descriptions",
+        "correct": 12,
+        "total": 12,
+        "misses": []
+      },
+      {
+        "variant": "B: empty descriptions + names t1..t5 + generic prompt",
+        "correct": 12,
+        "total": 12,
+        "misses": []
+      },
+      {
+        "variant": "C: fully opaque (names t1..t5, params arg1/arg2, no descriptions, generic prompt)",
+        "correct": 4,
+        "total": 12,
+        "misses": [
+          "\"What is Redis used for, according to the…\" expected search_documents, used [get_chunk,get_current_datetime] -> It seems there was an issue retrieving information about Redis from th…",
+          "\"What is Redis used for, according to the…\" expected search_documents, used [get_current_datetime] -> I currently can't access the documents to check the specific uses of R…",
+          "\"What is Redis used for, according to the…\" expected search_documents, used [get_chunk,list_documents,calculate,get_current_datetime] -> I encountered difficulties retrieving information about Redis from the…",
+          "\"What is 1234 * 5678?\" expected calculate, used [none] -> 1234 * 5678 equals 7, branching logic 12,345,432.",
+          "\"What is 1234 * 5678?\" expected calculate, used [none] -> 1234 * 5678 equals 7,128,632.",
+          "\"What is 1234 * 5678?\" expected calculate, used [none] -> 1234 * 5678 equals 7,urry2432.",
+          "\"Which documents do you have?\" expected list_documents, used [get_current_datetime] -> I currently do not have access to any documents.",
+          "\"Which documents do you have?\" expected list_documents, used [get_current_datetime] -> I don't have access to specific documents. If you have documents you'd…"
+        ]
+      }
+    ]
+  }
+}

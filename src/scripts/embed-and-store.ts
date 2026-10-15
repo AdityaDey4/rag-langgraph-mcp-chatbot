@@ -1,19 +1,7 @@
-import "dotenv/config";
-
-import OpenAI from "openai";
-import { QdrantClient } from "@qdrant/js-client-rest";
+import { getOpenAI, getQdrant } from "../lib/clients";
+import { COLLECTION_NAME, EMBEDDING_MODEL } from "../lib/config";
 import { n8nOutput } from "../data/n8n-output";
 import { randomUUID } from "crypto";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const qdrant = new QdrantClient({
-  url: process.env.QDRANT_URL!,
-});
-
-const COLLECTION_NAME = "rag_documents";
 
 async function main() {
   const chunks = n8nOutput.pdf_data.chunks;
@@ -26,8 +14,8 @@ async function main() {
   // 2. Generate embeddings
   console.log("Generating embeddings...");
 
-  const response = await openai.embeddings.create({
-    model: "text-embedding-3-large",
+  const response = await getOpenAI().embeddings.create({
+    model: EMBEDDING_MODEL,
     input: texts,
   });
   console.log("Prompt Token : ", response.usage.prompt_tokens);
@@ -54,7 +42,7 @@ async function main() {
   // 4. Store points in Qdrant
   console.log("Storing points in Qdrant...");
 
-  await qdrant.upsert(COLLECTION_NAME, {
+  await getQdrant().upsert(COLLECTION_NAME, {
     wait: true,
     points,
   });

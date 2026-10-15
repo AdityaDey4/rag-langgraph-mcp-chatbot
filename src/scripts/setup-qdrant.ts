@@ -1,12 +1,7 @@
-import "dotenv/config";
+import { getQdrant } from "../lib/clients";
+import { COLLECTION_NAME } from "../lib/config";
 
-import { QdrantClient } from "@qdrant/js-client-rest";
-
-const qdrant = new QdrantClient({
-  url: process.env.QDRANT_URL!,
-});
-
-const COLLECTION_NAME = "rag_documents";
+const qdrant = getQdrant();
 
 async function main() {
   const collections = await qdrant.getCollections();
