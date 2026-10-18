@@ -4,11 +4,15 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.4, 2026-10-18. **Phase 1 (graph fundamentals) is done**; Phase 2 (state and reducers) is next |
+| **Status** | Draft v0.5, 2026-10-18. **Phases 1 and 2 are done** (graph fundamentals; state and reducers); Phase 3 (tool calling and agent loops) is next |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
 | **Not a goal** | Replacing the hand-built agent, or integrating with the web app. |
+
+### What changed in v0.5
+
+**Phase 2 (state and reducers) is done.** The agent now has a real state, `AgentState` in `state.ts`: the messages plus three fields with different reducers (`searchCount` adds, `searchQueries` joins, `lastAnswer` replaces). `agent.ts` returns updates for them and logs the state (`· state:` lines), and `tests/test-state.ts` checks each reducer. An earlier stream-based trace script was removed because streaming is a later topic (Phase 6).
 
 ### What changed in v0.4
 
@@ -44,7 +48,7 @@ The **domain stays the same** so no time is spent on content: the same five tool
 | Concept | Where it is learned |
 |---|---|
 | State, nodes, edges, conditional edges; a `while` loop becomes a graph | Phase 1 ✅ |
-| Reducers: why `messages` appends and a counter can add | Phase 2 |
+| Reducers: why `messages` appends instead of overwriting | Phase 2 ✅ |
 | What `ToolNode` does, and why you might replace it | Phase 3 |
 | Recursion limit vs explicit stopping conditions | Phases 1 and 3 |
 | Checkpointers and threads: how memory works | Phase 4 |
@@ -91,6 +95,10 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 | 16 | `verboseParsingErrors: true` makes a bad-argument message name the wrong field (without it the model only sees "did not match expected schema") | 3 |
 | 17 | LangChain's built-in fake models cannot script a tool-call sequence (`FakeStreamingChatModel` drops `tool_calls`), so a `ScriptedChatModel` was written (now removed, restorable) | 3, 8 |
 | 18 | `usage_metadata` (token counts) is present on AI messages from a scripted model | 6 |
+| 19 | `Annotation.Root({ ...MessagesAnnotation.spec, myField: Annotation<T>({ reducer, default }) })` adds fields to the ready-made message state; each field's `reducer(current, update)` decides how an update is merged | 2 ✅ |
+| 20 | `addMessages(existing, added)` **appends**; a message with the **same id replaces** the old one; a message without an id is **given one**; a plain `{ role, content }` object becomes a real message | 2 ✅ |
+| 21 | With `streamMode: ["updates", "values"]` the order is: one `values` (the state made from the input), then for each node an `updates` (only what it returned) followed by a `values` (the whole state after the merge) | 6 (verified early, not used in Phase 2) |
+| 22 | A `ToolMessage` carries the `tool_call_id` of the AI message's tool call that it answers, which is how results are matched to requests | 2 ✅ |
 
 **Worth knowing:**
 
@@ -98,7 +106,7 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 
 **Not verified yet:** token `usage_metadata` when a real `ChatOpenAI` is streamed through a graph (checked in Phase 6; the current logs do show it for non-streamed calls). `createAgent` (LangChain v1's prebuilt agent) is deliberately not used.
 
-**Naming rule:** follow what the current docs and installed types say (`StateSchema`, `MessagesValue`, `ReducedValue`, `UntrackedValue`, `GraphNode`, `ConditionalEdgeRouter`). Ignore older `Annotation` examples. (`agent.ts` currently uses `MessagesAnnotation`, which still works; Phase 2 looks at the difference.)
+**Naming rule:** state is written with `Annotation.Root` and `MessagesAnnotation.spec`, as the curriculum does; both still work in 1.5.0. `StateSchema` + `MessagesValue` is the newer equivalent in the current docs and is what the removed tests used. Follow the installed types over web examples.
 
 ---
 
@@ -138,7 +146,7 @@ This is a learning project, so the code is part of the lesson. Every phase follo
 1. **Short files, one idea each.** Aim for about 100 lines. If a file needs scrolling to understand, split it or cut it.
 2. **Use LangGraph's built-in pieces first** (`ToolNode`, `MessagesValue`, `MemorySaver`, `interrupt`, `Send`). Write our own version only when seeing *why* is the lesson (Phase 3 may replace `ToolNode` once, on purpose).
 3. **Plain code.** Simple names, small functions, no clever generics, no abstraction layers "for later", no options or flags a phase does not use. Prefer repeating three lines to inventing a helper.
-4. **Comments teach LangGraph.** Where a LangGraph idea is used, say what it does in a plain sentence ("this edge sends control back to the agent: it is what makes the loop"). Do not comment what the code obviously says. Functions carry an "Example return" comment.
+4. **Comments are short.** One line at the top of a file saying what it is; at most one line above a function, in the form `// Example: f(x) returns y`; an inline comment only for something that is not obvious. No paragraphs, no section dividers, nothing that restates the code. The explanations belong in this document, not in the code.
 5. **Build the smallest thing that shows the idea.** Extra guardrails and commands are added only if they teach something new.
 6. **Tests read like examples.** One small scenario each, a name that says what is shown, no test helpers that hide the graph being tested.
 
@@ -152,7 +160,7 @@ The code so far follows these rules: every source file is about 105 lines or few
 
 | Hand-built (`loop.ts`) | LangGraph version | Free or ours? | Phase |
 |---|---|---|---|
-| `messages` array | `state.messages` with `MessagesAnnotation` / `MessagesValue` (appends) | Free | 2 |
+| `messages` array | `state.messages` with `MessagesAnnotation` / `MessagesValue` (appends) | Free | 2 ✅ |
 | `for (;;)` loop | Edges: `llm → router → tools → llm` | Free (structure) | 1 ✅ |
 | `if (reply.toolCalls.length === 0) return` | Router (conditional edge) → `END` | Ours (about 5 lines) | 1 ✅ |
 | `callModel` (stream OpenAI) | `ChatOpenAI.bindTools(tools)` inside the `llm` node | Free | 1 ✅ |
@@ -190,7 +198,7 @@ START ──▶ llm ────▶ router ──┬── tool calls, budgets O
 
 ### State
 
-**Not built yet.** `agent.ts` currently uses LangGraph's ready-made `MessagesAnnotation`, whose state is just `messages`. A custom state with counters was tried once and removed again; it comes back in Phase 2, where the task is to print and explain the state after every node. The sketch below is the plan.
+**Today** (Phase 2): `AgentState` in `state.ts` has four fields: `messages` (appended), `searchCount` (added up), `searchQueries` (joined into a list) and `lastAnswer` (replaced). See Phase 2 in section 10. The larger sketch below is a plan for later phases (budgets and stopping conditions in Phase 3, custom state in Phase 7); none of it is built.
 
 ```ts
 const State = new StateSchema({
@@ -210,7 +218,7 @@ const State = new StateSchema({
 });
 ```
 
-Exact field syntax follows the installed types (re-check in Phase 2). Per-run values that must not be checkpointed (start time) use `UntrackedValue`.
+Exact field syntax follows the installed types (re-check when this is built). Per-run values that must not be checkpointed (start time) use `UntrackedValue`.
 
 ### Nodes
 
@@ -246,12 +254,14 @@ Because there is no web layer, the terminal is where LangGraph's behaviour is ma
 
 **Today** (built): `npm run langgraph -- "question"` prints the question, a step-by-step log (lines starting with `·`), and the answer. `LANGGRAPH_LOG=off` silences the log. The log shows what goes into the model, what it replied (text or tool requests with arguments, token counts, why it stopped), and which way the router turned.
 
+**Also (Phase 2):** the log prints the state before each model call and after each model reply (`· state: searchCount=1, searchQueries=["Kafka"], lastAnswer=""`).
+
 **Planned options** for a richer CLI, each added in the phase that teaches it:
 
 | Option | What it shows | Phase |
 |---|---|---|
 | `--mermaid` | The compiled graph as a Mermaid diagram (paste into any Mermaid viewer) | 1 (optional) |
-| `--stream values` | The **full state** after every step | 2, 6 |
+| `--stream values` | The **full state** after every step | 6 |
 | `--stream updates` | Only what each node **changed**, keyed by node name | 6 |
 | `--stream messages` | **Tokens** as the model produces them, with the node that produced them | 6 |
 | `--stream custom` | Whatever nodes emit with `config.writer` (progress notes) | 6 |
@@ -284,21 +294,22 @@ Everything is under `src/langgraph/`. ✅ = exists.
 src/langgraph/
   agent.ts               ✅ the graph: model node, tool node, router (with step-by-step logging)
   agent-index.ts         ✅ run it:  npm run langgraph -- "question"
+  state.ts               ✅ Phase 2: AgentState, the fields and their reducers
   config.ts              ✅ model and collection names
   prompt.ts              ✅ system prompt + untrusted-data wrapper
   retrieval.ts           ✅ search / fetch one passage / list documents (Qdrant)
   tools/                 ✅ one file per tool + index.ts (the toolbox)
   tests/
     test-tools.ts        ✅ the tools, plus the "stands alone" check
+    test-state.ts        ✅ Phase 2: each state field and its reducer
   --- planned, not present now ---
-  state.ts               The state with counters (Phase 2)
   testing/scripted-model.ts, tests/test-graph.ts   Fake model + graph tests (Phase 3)
   cli.ts                 The richer terminal interface in section 6 (Phases 3 to 7)
 docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent), `test:langgraph-tools` (tools and the "stands alone" check).
+npm scripts: `langgraph` (run the agent), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -331,8 +342,8 @@ The scripted model records every request, so tests can assert what the model was
 | Phase | Topic | Status |
 |---|---|---|
 | 1 | Graph fundamentals | ✅ **Done** |
-| 2 | State and reducers | ⏭️ **Next** |
-| 3 | Tool calling and agent loops | ⬜ |
+| 2 | State and reducers | ✅ **Done** |
+| 3 | Tool calling and agent loops | ⏭️ **Next** |
 | 4 | Persistence and memory | ⬜ |
 | 5 | Human-in-the-loop | ⬜ |
 | 6 | Streaming and observability | ⬜ |
@@ -441,7 +452,9 @@ Why: the model asked for **both tools in one reply**, so the `tools` node ran bo
 
 ---
 
-### Phase 2: State and reducers ⏭️ *next lesson*
+### Phase 2: State and reducers ✅
+
+**Learn how the agent carries information between steps.**
 
 - What graph state actually contains
 - `MessagesAnnotation`
@@ -453,11 +466,86 @@ Why: the model asked for **both tools in one reply**, so the `tools` node ran bo
 
 **Outcome:** understand how the agent carries information between steps.
 
-*Where it starts:* `agent.ts` uses `MessagesAnnotation`, a ready-made state that holds only `messages`. The "sending N messages" log already hints at the idea: the count grows from 2 to 4 to 5 as nodes add messages. Design: section 5 (State), and the reducer facts in section 2.
+**What was built:** `state.ts` (the whole lesson, 24 lines), `agent.ts` using it and logging it, and `tests/test-state.ts` (7 tests, no network). Design: sections 4 and 5.
+
+#### The state (`state.ts`)
+
+```ts
+const AgentState = Annotation.Root({
+  ...MessagesAnnotation.spec,                       // messages: appended
+
+  searchCount: Annotation<number>({
+    reducer: (current, update) => current + update, // added up
+    default: () => 0,
+  }),
+  searchQueries: Annotation<string[]>({
+    reducer: (current, update) => [...current, ...update], // joined
+    default: () => [],
+  }),
+  lastAnswer: Annotation<string>({
+    reducer: (_current, update) => update,          // replaced
+    default: () => "",
+  }),
+});
+```
+
+| Field | Reducer | Example | Who updates it |
+|---|---|---|---|
+| `messages` | appends | `[human]` + `[ai]` gives `[human, ai]` | the `llm` node (the reply) and the `tools` node (the results) |
+| `searchCount` | adds | current 1, update 1 gives 2 | the `llm` node: how many `search_documents` calls this reply asks for |
+| `searchQueries` | joins | `["a"]` + `["b"]` gives `["a", "b"]` | the `llm` node: the queries of those calls |
+| `lastAnswer` | replaces | `""` then `"Kafka is …"` gives `"Kafka is …"` | the `llm` node: the text of its latest reply |
+
+How an update becomes state:
+
+1. A node **returns only what changed**, for example `{ messages: [reply], searchCount: 1, searchQueries: ["Kafka"], lastAnswer: "" }`. It never edits the state directly.
+2. LangGraph merges each returned field with **that field's reducer**: `reducer(current, update)` gives the new value.
+3. A field the node does not return is left alone (and a field nobody ever returns keeps its `default`).
+
+The three reducers are the three common shapes: **add** (a counter), **join** (a collection that grows) and **replace** (a value where only the newest matters).
+
+The three message types in `messages`:
+
+| Type | Put in the state by | Contains |
+|---|---|---|
+| `HumanMessage` | your input to `invoke()` | your question |
+| `AIMessage` | the `llm` node | text (the answer), or `tool_calls`: requests for tools, each with a name, arguments and an **id** |
+| `ToolMessage` | the `tools` node | one tool's result, with a `tool_call_id` that points back to the request it answers |
+
+#### The state after every node (the practical task)
+
+The agent logs the state before each model call and after each model reply (`· state:` lines). A real run of `"What does the document say about quantum penguins?"` (the model searches twice, then gives up), shortened:
+
+```
+· state: searchCount=0, searchQueries=[], lastAnswer=""                         <- start: all defaults
+· llm replied … finish: tool_calls   (asks for search_documents "quantum penguins")
+· state: searchCount=1, searchQueries=["quantum penguins"], lastAnswer=""       <- after llm: +1, query joined, lastAnswer replaced by "" (a tool request has no text)
+· router: … -> go to "tools"
+· state: searchCount=1, searchQueries=["quantum penguins"], lastAnswer=""       <- after tools: unchanged, the tools node only adds messages
+· llm replied … finish: tool_calls   (asks again, reworded)
+· state: searchCount=2, searchQueries=["quantum penguins","quantum physics penguins"], lastAnswer=""   <- 1 + 1 = 2, second query joined
+· router: … -> go to "tools"
+· state: searchCount=2, …                                                       <- after tools: unchanged
+· llm replied … finish: stop
+· state: searchCount=2, searchQueries=[…both…], lastAnswer="The documents do not seem to cover the t…"   <- lastAnswer replaced by the answer
+· router: … -> END
+```
+
+How each field got its value:
+
+- **`searchCount` = 2:** each of the two `llm` replies asked for one search, so it returned `1` twice, and the reducer added them.
+- **`searchQueries` = both queries:** each reply returned a one-item list, and the reducer joined them.
+- **`lastAnswer` = the final text:** replaced on every `llm` reply. It was `""` while the model was only asking for tools, and became the answer on the last reply. `runAgent` returns `result.lastAnswer`, so the answer you see comes from the state.
+- **`messages`:** the "sending N messages" log shows it growing (2, then 4, then 6). The system prompt is not in the state: `callModel` puts it in front on every call and never stores it.
+
+#### Things to notice
+
+- **Only the `llm` node changes the counters.** The `tools` node is LangGraph's ready-made `ToolNode`, which only adds messages, so a field it should update has to be updated from the `llm` node (which is why `searchCount` counts the searches the model *asked for*).
+- **The state only grows.** Every round appends messages, and the whole list is sent to the model again, which is why input tokens rise from call to call.
 
 ---
 
-### Phase 3: Tool calling and agent loops
+### Phase 3: Tool calling and agent loops ⏭️ *next lesson*
 
 Build on the five existing tools.
 
@@ -601,7 +689,7 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 1. Keep `ToolNode` after Phase 3, or always use a custom `tools` node (default: try replacing it once and compare).
 2. How far to go in Phase 7 (fan-out, subgraphs, node caching): all of it, or only parallel branches.
 3. Whether to run the Phase 8 comparison at all, or keep the notes qualitative.
-4. Whether to switch `agent.ts` from `MessagesAnnotation` to `StateSchema` + `MessagesValue` in Phase 2.
+4. ~~`MessagesAnnotation` or `StateSchema` + `MessagesValue`?~~ **Decided in Phase 2: `Annotation.Root` with `MessagesAnnotation.spec`**, as in the curriculum. It works in the installed version. The current docs prefer `StateSchema`; revisit if that changes.
 
 ---
 
@@ -627,7 +715,7 @@ Items are checked off as phases complete.
 - [x] `npm run langgraph -- "question"` answers using tools and prints a readable, step-by-step log. *(Phase 1)*
 - [x] `src/langgraph/` imports nothing from outside itself (enforced by a test).
 - [x] No `any` in `src/langgraph/`; lint clean for the files there.
-- [ ] State after every node can be printed and explained. *(Phase 2)*
+- [x] The state can be seen after every node and explained. *(Phase 2: the `· state:` log lines and `AgentState`)*
 - [ ] A failed tool call is handled and the model recovers; stopping conditions are tested against a scripted model. *(Phase 3, section 9)*
 - [ ] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4)*
 - [ ] A risky tool pauses for approval and resumes on the same thread. *(Phase 5)*

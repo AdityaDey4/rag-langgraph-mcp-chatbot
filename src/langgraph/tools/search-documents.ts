@@ -6,11 +6,7 @@ import { searchChunks } from "../retrieval";
 const SNIPPET_LENGTH = 1200; // characters of each passage shown to the model
 
 export const searchDocuments = tool(
-  // Example return, for { query: "What is Kafka?", topK: 2 } (inside the <tool_result> wrapper), best match first:
-  //   [ { "chunkId": "fd04038f-…", "filename": "school.pdf", "section": "Kafka", "pages": [3],
-  //       "score": 0.474, "snippet": "Kafka Apache Kafka is a distributed event-streaming platform …" },
-  //     { "chunkId": "…", … } ]
-  // Nothing found returns the text "No passages found."
+  // Example: { query: "What is Kafka?", topK: 2 } returns the best matches first: [ { "chunkId": "fd04…", "section": "Kafka", "score": 0.474, "snippet": "…" }, … ]
   async ({ query, topK }) => {
     const chunks = await searchChunks(query, topK ?? 4);
     if (chunks.length === 0) return wrapToolResult("search_documents", "No passages found.");

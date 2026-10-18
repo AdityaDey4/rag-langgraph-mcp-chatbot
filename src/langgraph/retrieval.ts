@@ -1,40 +1,33 @@
-// Talking to the document store (Qdrant). The tools in ./tools use these.
+// Reads the documents from Qdrant. The tools in ./tools use these functions.
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { COLLECTION_NAME, EMBEDDING_MODEL } from "./config";
 
-// A passage of a document.
+// A passage of a document. `score` is only set when found by a search.
 export type Chunk = {
   id: string;
   filename: string | null;
   section: string | null;
   pages: number[];
   text: string;
-  score: number | null; // similarity to the query (only when found by a search)
+  score: number | null;
 };
 
-// Created on first use, so importing this file never needs the environment variables.
+// Created on first use, so importing this file doesn't need the environment variables.
 let embeddings: OpenAIEmbeddings | undefined;
 let qdrant: QdrantClient | undefined;
 
-// Example return: the embeddings helper, OpenAIEmbeddings { model: "text-embedding-3-large" }.
-// It is created once; every later call returns the same object.
+// Example: returns the embeddings helper, created once and reused
 function getEmbeddings() {
   return (embeddings ??= new OpenAIEmbeddings({ model: EMBEDDING_MODEL }));
 }
 
-// Example return: the Qdrant connection, QdrantClient pointed at http://localhost:6333.
-// It is created once; every later call returns the same object.
+// Example: returns the Qdrant connection (http://localhost:6333), created once and reused
 function getQdrant() {
   return (qdrant ??= new QdrantClient({ url: process.env.QDRANT_URL! }));
 }
 
-// The `limit` passages most similar in meaning to the query.
-// Example: searchChunks("What is Kafka?", 2) returns the 2 best matches, best first (illustrative values):
-//   [
-//     { id: "fd04038f-…", filename: "school.pdf", section: "Kafka", pages: [3], text: "Kafka Apache Kafka is a distributed …", score: 0.47 },
-//     { id: "acfa72b7-…", filename: "school.pdf", section: "Java",  pages: [1], text: "Java Java is a general-purpose …",    score: 0.21 },
-//   ]   (score: higher means closer in meaning to the question)
+// Example: searchChunks("What is Kafka?", 2) returns the 2 closest passages, best first: [ { id: "fd04…", section: "Kafka", score: 0.47, … }, … ]
 export async function searchChunks(query: string, limit: number): Promise<Chunk[]> {
   const vector = await getEmbeddings().embedQuery(query);
 
@@ -47,24 +40,17 @@ export async function searchChunks(query: string, limit: number): Promise<Chunk[
   return result.points.map((point) => toChunk(point.id, point.payload, point.score));
 }
 
-// One passage by its id, or null if there is none.
-// Example: getChunkById("fd04038f-…") returns that one passage (score is null, because nothing was searched):
-//   { id: "fd04038f-…", filename: "school.pdf", section: "Kafka", pages: [3], text: "Kafka Apache Kafka is …", score: null }
-// An id that does not exist returns null.
+// Example: getChunkById("fd04…") returns { id: "fd04…", section: "Kafka", score: null, … }, or null if there is no such id
 export async function getChunkById(id: string): Promise<Chunk | null> {
   const points = await getQdrant().retrieve(COLLECTION_NAME, { ids: [id], with_payload: true });
   return points.length > 0 ? toChunk(points[0].id, points[0].payload, null) : null;
 }
 
-// Which documents exist, with their section titles and how many passages each has.
-// Example return (one entry per document):
-//   [ { documentId: "document_001", filename: "school.pdf",
-//       sections: ["DBMS", "Redis", "AI", "Java", "n8n", "Kafka"], chunkCount: 9 } ]
-// With nothing indexed it returns [].
+// Example: listDocuments() returns [ { documentId: "document_001", filename: "school.pdf", sections: ["DBMS", "Redis", …], chunkCount: 9 } ]
 export async function listDocuments() {
   const documents = new Map<string, { filename: string | null; sections: string[]; chunkCount: number }>();
 
-  // Read every point (without vectors), a page at a time.
+  // Qdrant returns the points in pages; keep asking until there is no next page.
   let offset: string | number | Record<string, unknown> | null | undefined;
   do {
     const page = await getQdrant().scroll(COLLECTION_NAME, {
@@ -90,10 +76,7 @@ export async function listDocuments() {
   return [...documents.entries()].map(([documentId, doc]) => ({ documentId, ...doc }));
 }
 
-// Qdrant stores each passage's details in a loose "payload"; read it safely.
-// Example: toChunk("fd04…", { filename: "school.pdf", section: "Kafka", pageNumbers: [3], text: "Kafka …" }, 0.47) returns
-//   { id: "fd04…", filename: "school.pdf", section: "Kafka", pages: [3], text: "Kafka …", score: 0.47 }
-// Missing payload fields become null (filename, section), [] (pages) or "" (text).
+// Example: toChunk("fd04…", { filename: "school.pdf", section: "Kafka", pageNumbers: [3], text: "…" }, 0.47) returns { id: "fd04…", filename: "school.pdf", section: "Kafka", pages: [3], text: "…", score: 0.47 }
 function toChunk(id: string | number, payload: Record<string, unknown> | null | undefined, score: number | null): Chunk {
   const data = payload ?? {};
   return {
@@ -106,7 +89,7 @@ function toChunk(id: string | number, payload: Record<string, unknown> | null | 
   };
 }
 
-// Examples: asText("Kafka") returns "Kafka"; asText(42) returns null; asText(undefined) returns null.
+// Example: asText("Kafka") returns "Kafka"; asText(42) and asText(undefined) return null
 function asText(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }

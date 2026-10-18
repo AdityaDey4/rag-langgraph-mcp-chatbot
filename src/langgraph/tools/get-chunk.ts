@@ -4,9 +4,8 @@ import { wrapToolResult } from "../prompt";
 import { getChunkById } from "../retrieval";
 
 export const getChunk = tool(
-  // Example return, for { chunkId: "fd04038f-…" } (inside the <tool_result> wrapper), with the FULL text:
-  //   { "chunkId": "fd04038f-…", "filename": "school.pdf", "section": "Kafka", "pages": [3], "text": "Kafka Apache Kafka is …" }
-  // An id that does not exist throws Error(No passage found with chunkId "…").
+  // Example: { chunkId: "fd04…" } returns the full passage as JSON: { "chunkId": "fd04…", "section": "Kafka", "text": "Kafka Apache Kafka is …" }
+  // An unknown id throws, and ToolNode turns the error into a message for the model.
   async ({ chunkId }) => {
     const chunk = await getChunkById(chunkId);
     if (!chunk) throw new Error(`No passage found with chunkId "${chunkId}".`);

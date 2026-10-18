@@ -4,10 +4,7 @@ import { wrapToolResult } from "../prompt";
 import { listDocuments as fetchDocuments } from "../retrieval";
 
 export const listDocuments = tool(
-  // Example return (inside the <tool_result> wrapper):
-  //   [ { "documentId": "document_001", "filename": "school.pdf",
-  //       "sections": ["DBMS", "Redis", "AI", "Java", "n8n", "Kafka"], "chunkCount": 9 } ]
-  // With nothing indexed it returns the text "No documents have been indexed yet."
+  // Example: returns [ { "documentId": "document_001", "filename": "school.pdf", "sections": ["DBMS", "Redis", …], "chunkCount": 9 } ]
   async () => {
     const documents = await fetchDocuments();
     const text = documents.length === 0 ? "No documents have been indexed yet." : JSON.stringify(documents, null, 2);

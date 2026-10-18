@@ -1,7 +1,6 @@
 
 import {
   StateGraph,
-  MessagesAnnotation,
   START,
   END,
 } from "@langchain/langgraph";
@@ -18,37 +17,25 @@ import {
 
 import { CHAT_MODEL } from "./config";
 import { SYSTEM_PROMPT } from "./prompt";
+import { AgentState } from "./state";
 import { tools } from "./tools";
 
-// Logging: lines starting with "·" show what happens INSIDE the graph, in order:
-//   - what is sent to the model (the conversation so far),
-//   - what the model replied (an answer, or tool requests with their arguments),
-//   - which way the graph turns next.
-// A tool's result is not logged when the tool runs; it shows up as "tool (...)" in the
-// conversation listed at the next model call.
-// They are on by default. Silence them with
-//   LANGGRAPH_LOG=off npm run langgraph -- "your question"
-// Example return: nothing. log("llm: sending 2 messages") prints   · llm: sending 2 messages
+// Lines starting with "·" log what goes into the model and where the graph turns.
+// Turn them off with LANGGRAPH_LOG=off.
 const LOGGING_ON = process.env.LANGGRAPH_LOG !== "off";
 
+// Example: log("llm: sending 2 messages") prints "   · llm: sending 2 messages"
 function log(text: string) {
   if (LOGGING_ON) console.log(`   · ${text}`);
 }
 
-// Makes text short enough for one log line: tags removed, whitespace flattened, cut to `max` characters.
-// Example: shorten("<tool_result tool=\"x\">\n[ { \"chunkId\": \"fd04…\" } ]\n</tool_result>") returns '[ { "chunkId": "fd04…" } ]'
+// Example: shorten("<tool_result>[ 1, 2 ]</tool_result>") returns "[ 1, 2 ]"
 function shorten(text: string, max = 150): string {
   const flat = text.replace(/<\/?tool_result[^>]*>/g, "").replace(/\s+/g, " ").trim();
   return flat.length > max ? flat.slice(0, max) + "…" : flat;
 }
 
-// One readable line for any message in the conversation. An AI message that asks for
-// a tool has EMPTY text, so its tool calls (name + arguments) are what we show.
-// Examples:
-//   human message         ->  human: "What is Kafka?"
-//   AI message with tools ->  ai: asks for 1 tool(s) -> search_documents {"query":"Kafka"}
-//   AI final answer       ->  ai: "Apache Kafka is a distributed event-streaming platform …"
-//   tool result           ->  tool (search_documents, success): [ { "chunkId": "fd04038f-…
+// Example: describe(aiMessage) returns 'ai: asks for 1 tool(s) -> search_documents {"query":"Kafka"}'
 function describe(message: BaseMessage): string {
   const text = shorten(typeof message.content === "string" ? message.content : JSON.stringify(message.content));
 
@@ -62,6 +49,11 @@ function describe(message: BaseMessage): string {
   return `${message.getType()}: "${text}"`;
 }
 
+// Example: describeState(state) returns 'searchCount=1, searchQueries=["Kafka"], lastAnswer=""'
+function describeState(state: typeof AgentState.State): string {
+  return `searchCount=${state.searchCount}, searchQueries=${JSON.stringify(state.searchQueries)}, lastAnswer="${shorten(state.lastAnswer, 40)}"`;
+}
+
 // 1. Initialize the LLM
 const model = new ChatOpenAI({
   model: CHAT_MODEL,
@@ -72,15 +64,10 @@ const model = new ChatOpenAI({
 const modelWithTools = model.bindTools(tools);
 
 // 3. LLM node: generate a response or request tools
-// Example return (a state update that LangGraph adds to the conversation):
-//   the model answers:      { messages: [ AIMessage("Hello! How can I assist you today?") ] }
-//   the model asks a tool:  { messages: [ AIMessage(tool_calls: [{ name: "calculate", args: { expression: "48213 * 317" } }]) ] }
-async function callModel(state: typeof MessagesAnnotation.State) {
-  // The model is shown the system prompt plus the whole conversation so far.
-  // "last message from" tells you why it is being called: "human" = your question,
-  // "tool" = a tool has just answered and the model is reading the result.
+// Example return: { messages: [ AIMessage("Kafka is …") ], searchCount: 0, searchQueries: [], lastAnswer: "Kafka is …" }
+async function callModel(state: typeof AgentState.State) {
+  log(`state: ${describeState(state)}`);
   log(`llm: sending ${state.messages.length + 1} messages to ${CHAT_MODEL} (system prompt + ${state.messages.length} conversation, last message from "${state.messages.at(-1)?.getType()}")`);
-  // The conversation the model is about to read (the system prompt is left out: it is the same every time).
   state.messages.forEach((message, index) => log(`  ${index + 1}. ${describe(message)}`));
 
   const response = await modelWithTools.invoke([
@@ -88,14 +75,19 @@ async function callModel(state: typeof MessagesAnnotation.State) {
     ...state.messages,
   ]);
 
-  // The AI message the model just produced: its text or tool requests, token counts, and why it stopped
-  // ("tool_calls" = it wants a tool, "stop" = it finished its answer).
   const usage = response.usage_metadata;
   log(`llm replied (${usage?.input_tokens} tokens in, ${usage?.output_tokens} out, finish: ${response.response_metadata?.finish_reason})`);
   log(`  ${describe(response)}`);
 
+  // Return only what changed. LangGraph merges each field into the state with its reducer (see state.ts).
+  // Only search_documents calls count; list_documents, get_chunk, calculate etc. are ignored here.
+  const searches = (response.tool_calls ?? []).filter((call) => call.name === "search_documents");
+
   return {
     messages: [response],
+    searchCount: searches.length,
+    searchQueries: searches.map((call) => call.args.query as string),
+    lastAnswer: String(response.content),
   };
 }
 
@@ -103,11 +95,10 @@ async function callModel(state: typeof MessagesAnnotation.State) {
 const toolNode = new ToolNode(tools);
 
 // 5. Conditional routing: tools or final answer
-// Example return: the NAME of the node that runs next.
-//   last message asks for a tool    ->  "tools"
-//   last message is a plain answer  ->  END (the text "__end__"), so the run finishes
-function shouldContinue(state: typeof MessagesAnnotation.State) {
+// Example return: "tools" if the model asked for a tool, otherwise END
+function shouldContinue(state: typeof AgentState.State) {
   const lastMessage = state.messages.at(-1);
+  log(`state: ${describeState(state)}`);
 
   if (
     lastMessage instanceof AIMessage &&
@@ -118,13 +109,13 @@ function shouldContinue(state: typeof MessagesAnnotation.State) {
     return "tools";
   }
 
-  // (The AI message itself is logged once, where it is created: "llm replied" in callModel.)
   log("router: the model gave a final answer -> END");
   return END;
 }
 
 // 6. Build and compile the graph
-export const graph = new StateGraph(MessagesAnnotation)
+// The state is AgentState (see state.ts): nodes return updates, and each field's reducer merges them in.
+export const graph = new StateGraph(AgentState)
   .addNode("llm", callModel)
   .addNode("tools", toolNode)
   .addEdge(START, "llm")
@@ -136,8 +127,7 @@ export const graph = new StateGraph(MessagesAnnotation)
   .compile();
 
 // 7. Export a reusable function for your application
-// Example: runAgent("What documents are available?") returns the final answer as plain text:
-//   "There is one document available: school.pdf (sections: DBMS, Redis, AI, Java, n8n, Kafka)."
+// Example: runAgent("What documents are available?") returns "There is one document available: school.pdf …"
 export async function runAgent(
   input: string,
   history: BaseMessage[] = [],
@@ -154,5 +144,5 @@ export async function runAgent(
     },
   );
 
-  return result.messages.at(-1)?.content ?? "";
+  return result.lastAnswer;
 }

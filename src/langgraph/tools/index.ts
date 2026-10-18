@@ -1,4 +1,4 @@
-// The agent's toolbox: the list handed to the model and to the graph's tool node.
+// The five tools, handed to the model and to the graph's tool node.
 import { calculate } from "./calculate";
 import { getChunk } from "./get-chunk";
 import { getCurrentDatetime } from "./get-current-datetime";
