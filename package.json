@@ -16,9 +16,15 @@
     "agent": "tsx src/scripts/agent-cli.ts",
     "test:agent-sse": "tsx src/scripts/test-agent-sse.ts",
     "agent:behaviour": "tsx src/scripts/agent-behaviour.ts",
-    "agent:experiments": "tsx src/scripts/agent-experiments.ts"
+    "agent:experiments": "tsx src/scripts/agent-experiments.ts",
+    "test:langgraph-tools": "tsx src/langgraph/tests/test-tools.ts",
+    "test:langgraph-agent": "tsx src/langgraph/agent-index.ts",
+    "langgraph": "tsx src/langgraph/agent-index.ts"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.18",
+    "@langchain/langgraph": "^1.5.0",
+    "@langchain/openai": "^1.6.2",
     "@qdrant/js-client-rest": "^1.19.0",
     "crypto": "^1.0.1",
     "dotenv": "^17.4.2",
