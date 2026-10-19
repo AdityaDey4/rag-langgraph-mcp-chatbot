@@ -21,7 +21,8 @@
     "langgraph": "tsx src/langgraph/agent-index.ts",
     "test:langgraph-state": "tsx src/langgraph/tests/test-state.ts",
     "test:langgraph-tool-node": "tsx src/langgraph/tests/test-tool-node.ts",
-    "test:langgraph-memory": "tsx src/langgraph/tests/test-memory.ts"
+    "test:langgraph-memory": "tsx src/langgraph/tests/test-memory.ts",
+    "test:langgraph-approve": "tsx src/langgraph/tests/test-approve.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.18",

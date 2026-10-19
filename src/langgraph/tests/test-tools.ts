@@ -54,10 +54,10 @@ async function main() {
 
   console.log("the toolbox");
 
-  await test("five tools, each with a name, a description and an object schema", () => {
+  await test("six tools, each with a name, a description and an object schema", () => {
     assert.deepEqual(
       tools.map((t) => t.name),
-      ["search_documents", "get_chunk", "list_documents", "calculate", "get_current_datetime"]
+      ["search_documents", "get_chunk", "list_documents", "calculate", "get_current_datetime", "send_email"]
     );
     for (const t of tools) {
       const sent = convertToOpenAITool(t).function; // exactly what is sent to the model

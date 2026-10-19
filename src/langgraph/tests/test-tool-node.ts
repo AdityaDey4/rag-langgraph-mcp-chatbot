@@ -76,10 +76,10 @@ async function main() {
   });
 
   await test("an unknown tool name becomes an error message listing the real tools", async () => {
-    const { messages } = await runTools(askFor(call("call_1", "send_email", {})));
+    const { messages } = await runTools(askFor(call("call_1", "delete_database", {})));
 
     assert.equal(messages[0].status, "error");
-    assert.match(String(messages[0].content), /no tool called "send_email"/);
+    assert.match(String(messages[0].content), /no tool called "delete_database"/);
     assert.match(String(messages[0].content), /calculate/);
   });
 

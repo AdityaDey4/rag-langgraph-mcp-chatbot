@@ -2,6 +2,7 @@
 import {
   StateGraph,
   MemorySaver,
+  Command,
   GraphRecursionError,
   START,
   END,
@@ -16,6 +17,7 @@ import {
   type BaseMessage,
 } from "@langchain/core/messages";
 
+import { approve, afterApprove, type Decision } from "./approve";
 import { CHAT_MODEL } from "./config";
 import { describe, log, shorten } from "./log";
 import { SYSTEM_PROMPT } from "./prompt";
@@ -34,7 +36,7 @@ const model = new ChatOpenAI({
   temperature: 0,
 });
 
-// 2. Make all five tools available to the LLM (means llm can request these tools; it never runs them)
+// 2. Make all six tools available to the LLM (means llm can request these tools; it never runs them)
 const modelWithTools = model.bindTools(tools);
 
 // Of the earlier questions, only the last MAX_MESSAGES messages (starting at a human message) are sent to the model.
@@ -85,7 +87,7 @@ async function callModel(state: typeof AgentState.State) {
 // 4. Tool node: execute requested tools (runTools in tool-node.ts, which replaces the ready-made ToolNode)
 
 // 5. Conditional routing: tools or final answer
-// Example return: "tools" if the model asked for a tool, otherwise END
+// Example return: "approve" if the model asked for a tool, otherwise END
 function shouldContinue(state: typeof AgentState.State) {
   const lastMessage = state.messages.at(-1);
   log(`state: ${describeState(state)}`);
@@ -95,8 +97,8 @@ function shouldContinue(state: typeof AgentState.State) {
     lastMessage.tool_calls?.length
   ) {
     const names = lastMessage.tool_calls.map((call) => call.name).join(", ");
-    log(`router: the model asked for ${lastMessage.tool_calls.length} tool(s) [${names}] -> go to "tools"`);
-    return "tools";
+    log(`router: the model asked for ${lastMessage.tool_calls.length} tool(s) [${names}] -> go to "approve"`);
+    return "approve";
   }
 
   log("router: the model gave a final answer -> END");
@@ -107,12 +109,17 @@ function shouldContinue(state: typeof AgentState.State) {
 // The checkpointer saves the state after every step under a thread_id. It lives in memory, so it is lost when the process stops.
 export const graph = new StateGraph(AgentState)
   .addNode("llm", callModel)
+  .addNode("approve", approve)
   .addNode("tools", runTools)
   .addNode("giveUp", giveUp)
   .addEdge(START, "llm")
   .addConditionalEdges("llm", shouldContinue, {
-    tools: "tools",
+    approve: "approve",
     [END]: END,
+  })
+  .addConditionalEdges("approve", afterApprove, {
+    tools: "tools",
+    llm: "llm",
   })
   .addConditionalEdges("tools", afterTools, {
     llm: "llm",
@@ -121,40 +128,92 @@ export const graph = new StateGraph(AgentState)
   .addEdge("giveUp", END)
   .compile({ checkpointer: new MemorySaver() });
 
-// 7. Export a reusable function for your application
+// 7. Export reusable functions for your application
+// What the human is asked to decide: the risky tool calls the model wants to make.
+type ApprovalRequest = {
+  calls: {
+    name: string;
+    args: Record<string, unknown>;
+  }[];
+};
+
+// A run ends with an answer, or stops at an approval: then the human's decision goes to resumeAgent.
+export type AgentResult =
+  | { answer: string }
+  | { approval: ApprovalRequest };
+
 // Same threadId = same conversation: earlier messages are loaded from the checkpointer.
-// Example: runAgent("What is Kafka?", "thread-a") returns "Apache Kafka is a distributed …"; a later runAgent("Summarize that", "thread-a") knows what "that" is
-export async function runAgent(
+// Example: runAgent("What is 2 + 2?", "thread-a") returns { answer: "4" }
+// Example: runAgent("Email ana@example.com hi", "thread-a") returns { approval: { calls: [{ name: "send_email", args: {…} }] } }
+export function runAgent(
   input: string,
   threadId: string,
   recursionLimit = 6,
 ) {
+  const newQuestion = {
+    messages: [new HumanMessage(input)],
+    toolErrors: 0, // a new question starts with no failures
+  };
+
+  return run(newQuestion, threadId, recursionLimit);
+}
+
+// Example: resumeAgent({ approve: true }, "thread-a") continues the paused run and returns { answer: "I sent the email." }
+export function resumeAgent(
+  decision: Decision,
+  threadId: string,
+  recursionLimit = 6,
+) {
+  return run(
+    new Command({ resume: decision }),
+    threadId,
+    recursionLimit,
+  );
+}
+
+async function run(
+  input: Parameters<typeof graph.invoke>[0],
+  threadId: string,
+  recursionLimit: number,
+): Promise<AgentResult> {
   try {
-    const result = await graph.invoke(
-      {
-        messages: [new HumanMessage(input)], // appended to the saved history
-        toolErrors: 0, // a new question starts with no failures
-      },
-      {
-        recursionLimit,
-        configurable: { thread_id: threadId },
-      },
-    );
+    const config = {
+      recursionLimit,
+      configurable: { thread_id: threadId },
+    };
+    const result = await graph.invoke(input, config);
+
+    // A run that stopped at interrupt() has a task with an interrupt; its value says what the human must decide.
+    const savedState = await graph.getState(config);
+    const interrupts = savedState.tasks.flatMap((task) => task.interrupts);
+    const pending = interrupts[0];
+
+    if (pending) {
+      log(`paused: waiting for approval on thread ${threadId}`);
+      return { approval: pending.value };
+    }
 
     // Every model call is one step and every tools run is one step (the give-up node counts like a model call).
     const lastQuestion = result.messages.findLastIndex((message) => message instanceof HumanMessage);
     const thisRun = result.messages.slice(lastQuestion + 1); // only the messages of this question
     const modelCalls = thisRun.filter((message) => message instanceof AIMessage);
     const toolRuns = modelCalls.filter((message) => message.tool_calls?.length);
-    // A run that takes N steps only finishes if the limit is at least N + 1.
-    log(`Thread: ${threadId}, saved messages: ${result.messages.length}, model calls: ${modelCalls.length}, tool runs: ${toolRuns.length}, total steps: ${modelCalls.length + toolRuns.length}, recursion limit: ${recursionLimit}`);
+    const totalSteps = modelCalls.length + toolRuns.length;
 
-    log(`===============================================================================`)
-    return result.lastAnswer;
+    // A run that takes N steps only finishes if the limit is at least N + 1.
+    log(
+      `Thread: ${threadId}, saved messages: ${result.messages.length}, ` +
+      `model calls: ${modelCalls.length}, tool runs: ${toolRuns.length}, ` +
+      `total steps: ${totalSteps}, recursion limit: ${recursionLimit}`,
+    );
+
+    return { answer: result.lastAnswer };
   } catch (error) {
     // The graph ran more steps than recursionLimit allows, so LangGraph stopped it.
     if (error instanceof GraphRecursionError) {
-      return `I stopped because the step limit (${recursionLimit}) was reached before I could finish. Please try a simpler question.`;
+      return {
+        answer: `I stopped because the step limit (${recursionLimit}) was reached before I could finish. Please try a simpler question.`,
+      };
     }
     throw error;
   }

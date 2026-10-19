@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.7, 2026-10-19. **Phases 1 to 4 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory); Phase 5 (human-in-the-loop) is next |
+| **Status** | Draft v0.8, 2026-10-19. **Phases 1 to 5 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop); Phase 6 (streaming and observability) is next |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
@@ -24,7 +24,7 @@ The roadmap (section 10) is now the **eight-phase learning path**: Phase 1 graph
 
 ### What changed in v0.3
 
-**LangGraph lives in its own self-contained folder, `src/langgraph/`, and imports nothing from the rest of the project.** Code that the hand-built agent also has (the five tools, the system prompt, the document search, the calculator) is **duplicated** into that folder on purpose. The goal is a clean, easy-to-follow structure where everything about LangGraph is in one place, even though some code exists twice. A test enforces it: it fails if any file in `src/langgraph/` imports from outside the folder.
+**LangGraph lives in its own self-contained folder, `src/langgraph/`, and imports nothing from the rest of the project.** Code that the hand-built agent also has (the six tools, the system prompt, the document search, the calculator) is **duplicated** into that folder on purpose. The goal is a clean, easy-to-follow structure where everything about LangGraph is in one place, even though some code exists twice. A test enforces it: it fails if any file in `src/langgraph/` imports from outside the folder.
 
 ### What changed in v0.2
 
@@ -45,7 +45,7 @@ LangGraph describes an agent as a **graph**: nodes (steps) joined by edges (what
 - what you still write yourself (budgets, a forced final answer, a repeat guard, citation checks),
 - what it costs (a dependency, indirection, a different way of thinking about control flow).
 
-The **domain stays the same** so no time is spent on content: the same five tools, the same system prompt, the same Qdrant index, the same 17 test questions. Only the control flow changes.
+The **domain stays the same** so no time is spent on content: the same six tools, the same system prompt, the same Qdrant index, the same 17 test questions. Only the control flow changes.
 
 ### What you should be able to explain at the end
 
@@ -129,7 +129,7 @@ Everything the agent needs is **copied in** so that nothing outside the folder i
 
 | Copied into `src/langgraph/` | From | Why copy |
 |---|---|---|
-| `tools/` (five tools, as plain LangChain tools) | `lib/agent/tools/` | The folder stands alone; tools are written the LangChain way (no registry layer) |
+| `tools/` (six tools, as plain LangChain tools) | `lib/agent/tools/` | The folder stands alone; tools are written the LangChain way (no registry layer) |
 | `prompt.ts` (system prompt + untrusted-data wrapper) | `lib/agent/prompt.ts` | Same instructions, so differences come from the control flow, not the wording |
 | `retrieval.ts` (search, fetch one passage, list documents) | `lib/rag/retrieval.ts` | Same Qdrant documents; uses LangChain's `OpenAIEmbeddings` |
 | `config.ts` (model names, collection) | `lib/config.ts` | |
@@ -325,7 +325,7 @@ docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent; with no question it runs the Phase 4 memory demo), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
+npm scripts: `langgraph` (run the agent; with no question it runs the Phase 4 memory demo), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -363,8 +363,8 @@ The scripted model records every request, so tests can assert what the model was
 | 2 | State and reducers | ✅ **Done** |
 | 3 | Tool calling and agent loops | ✅ **Done** |
 | 4 | Persistence and memory | ✅ **Done** |
-| 5 | Human-in-the-loop | ⏭️ **Next** |
-| 6 | Streaming and observability | ⬜ |
+| 5 | Human-in-the-loop | ✅ **Done** |
+| 6 | Streaming and observability | ⏭️ **Next** |
 | 7 | Advanced graph patterns | ⬜ |
 | 8 | Production-ready agents | ⬜ |
 
@@ -685,7 +685,7 @@ The history grows with tool messages (4 messages for the first question, 8 after
 
 ---
 
-### Phase 5: Human-in-the-loop
+### Phase 5: Human-in-the-loop ✅
 
 Learn to pause an agent before sensitive actions.
 
@@ -700,6 +700,42 @@ Learn to pause an agent before sensitive actions.
 **Outcome:** build agents that can be supervised safely.
 
 *Design:* section 7, fact 9 (the node restarts on resume).
+
+**What was built**
+
+| Change | Where |
+|---|---|
+| `send_email`: a pretend risky tool (it only prints; nothing is sent) | `tools/send-email.ts` |
+| `approve` node between the model and the tools. If the model asked for a risky tool (`RISKY_TOOLS`), it calls `interrupt()` and the run stops | `approve.ts` |
+| `afterApprove` router: after a rejection the last message is a `ToolMessage`, so it goes back to `llm`; otherwise to `tools` | `approve.ts` |
+| `runAgent` now returns `{ answer }` or `{ approval }`; `resumeAgent(decision, threadId)` continues with `Command({ resume })` | `agent.ts` |
+| The terminal asks `Approve? [y]es / [n]o / [e]dit` and resumes | `agent-index.ts` |
+
+**Flow:** `llm → approve → tools → llm`. A safe tool passes through `approve` untouched.
+
+**Concepts**
+
+- **`interrupt(payload)`** stops the run at that point and saves it. The payload is what the caller must show the human. It needs a checkpointer and a `thread_id` (Phase 4), which is why persistence came first.
+- **Resume** is a new `invoke` on the same thread with `new Command({ resume: value })`. `interrupt()` then returns `value` inside the node.
+- **The node restarts from its top on resume** (fact 9, tested with a counter: started once before the resume, twice after). So `approve` does nothing with side effects before `interrupt()`.
+- **A pause is not an error.** `invoke` returns normally; `getState(config).tasks[].interrupts[]` holds the pending question (`.next` is `["approve"]`). `runAgent` reads it from there.
+- **Approve, reject, edit are all the same mechanism**: the human's answer is the `Decision` (`approve`, optional `args`). Reject adds one rejection `ToolMessage` per call (every tool call needs an answer) and the model sees it. Edit replaces the `AIMessage` using its own `id`, so the reducer swaps it instead of adding a second one.
+- **Why before the tool, not inside it:** the tool node runs all calls together, so an `interrupt()` inside it would restart (and re-run) the safe calls too.
+
+**Real runs** (`npm run langgraph -- "Send an email to ana@example.com with subject Hello and body Meeting at 5pm"`)
+
+| Answer typed | Result |
+|---|---|
+| `y` | Prints `SENDING EMAIL to ana@example.com`; the model says it was sent |
+| `n` | Nothing is sent; the model is told it was rejected |
+
+Edit was verified in `tests/test-approve.ts` (the tool runs with the new `to`). Piped input cannot feed two answers in a row, so the edit path was not driven from the terminal.
+
+**Findings**
+
+- **The model asked for confirmation itself** at first ("Shall I proceed?") instead of calling the tool, so nothing ever reached the approval step. The system prompt now says to call `send_email` right away because a human approves it. A prompt is not a guard: the approval step is the real one.
+- **Rejection wording matters.** With "the user did not approve", the model offered to send it anyway; the message now says not to try again and to tell the user it was not done.
+- `MemorySaver` is in-process, so a paused run is lost if the process stops. A database checkpointer would let an approval wait for days.
 
 ---
 
@@ -822,7 +858,7 @@ Items are checked off as phases complete.
 - [x] The state can be seen after every node and explained. *(Phase 2: the `· state:` log lines and `AgentState`)*
 - [x] A failed tool call is handled and the model recovers; stopping conditions are tested. *(Phase 3: `tests/test-tool-node.ts`, plus real runs recorded in section 10)*
 - [x] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4: `tests/test-memory.ts` and the demo in `agent-index.ts`)*
-- [ ] A risky tool pauses for approval and resumes on the same thread. *(Phase 5)*
+- [x] A risky tool pauses for approval and resumes on the same thread. *(Phase 5: `tests/test-approve.ts` and real runs)*
 - [ ] Tokens and tool progress stream separately; Ctrl+C cancels a run, including a running tool. *(Phase 6)*
 - [ ] Independent queries run in parallel and their results are combined; a run can be replayed and forked. *(Phase 7)*
 - [ ] Normal, incorrect and failed-tool scenarios are tested; `docs/LANGGRAPH-NOTES.md` explains what each LangGraph feature did and what was still hand-written. *(Phase 8)*
