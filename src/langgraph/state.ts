@@ -16,9 +16,9 @@ export const AgentState = Annotation.Root({
     default: () => [],
   }),
 
-  // Number of tool calls that failed. Added up. The agent gives up when it reaches 3 (see tool-node.ts)
+  // Tool failures in the current question. Replaced; runAgent resets it to 0 for each question. The agent gives up at 3 (see tool-node.ts)
   toolErrors: Annotation<number>({
-    reducer: (current, update) => current + update,
+    reducer: (_current, update) => update,
     default: () => 0,
   }),
 

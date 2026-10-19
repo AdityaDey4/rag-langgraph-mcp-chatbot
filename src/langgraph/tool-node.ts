@@ -11,7 +11,7 @@ export const MAX_TOOL_ERRORS = 3;
 
 const toolsByName: Record<string, StructuredToolInterface> = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
 
-// Example return: for one call that worked and one that failed: { messages: [ToolMessage(success), ToolMessage(error)], toolErrors: 1 }
+// Example return: for one call that worked and one that failed: { messages: [ToolMessage(success), ToolMessage(error)], toolErrors: 1 } (when none had failed before)
 export async function runTools(state: typeof AgentState.State) {
   const lastMessage = state.messages.at(-1) as AIMessage; // the AI message that asked for the tools
   const results = await Promise.all((lastMessage.tool_calls ?? []).map(runOne)); // the calls run side by side
@@ -20,7 +20,7 @@ export async function runTools(state: typeof AgentState.State) {
   log(`Last Message: ${describe(lastMessage)} -> ${results.length} tool calls completed, ${failed} failed`);
   return {
     messages: results,
-    toolErrors: failed,
+    toolErrors: state.toolErrors + failed,
   };
 }
 

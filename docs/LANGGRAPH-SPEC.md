@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.6, 2026-10-19. **Phases 1 to 3 are done** (graph fundamentals; state and reducers; tool calling and agent loops); Phase 4 (persistence and memory) is next |
+| **Status** | Draft v0.7, 2026-10-19. **Phases 1 to 4 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory); Phase 5 (human-in-the-loop) is next |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
@@ -325,7 +325,7 @@ docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
+npm scripts: `langgraph` (run the agent; with no question it runs the Phase 4 memory demo), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -362,8 +362,8 @@ The scripted model records every request, so tests can assert what the model was
 | 1 | Graph fundamentals | ✅ **Done** |
 | 2 | State and reducers | ✅ **Done** |
 | 3 | Tool calling and agent loops | ✅ **Done** |
-| 4 | Persistence and memory | ⏭️ **Next** |
-| 5 | Human-in-the-loop | ⬜ |
+| 4 | Persistence and memory | ✅ **Done** |
+| 5 | Human-in-the-loop | ⏭️ **Next** |
 | 6 | Streaming and observability | ⬜ |
 | 7 | Advanced graph patterns | ⬜ |
 | 8 | Production-ready agents | ⬜ |
@@ -638,7 +638,7 @@ The failure limit is checked *after the tools have run*, not before. That way ev
 
 ---
 
-### Phase 4: Persistence and memory ⏭️ *next lesson*
+### Phase 4: Persistence and memory ✅
 
 Learn how information survives beyond a single graph run.
 
@@ -653,6 +653,35 @@ Learn how information survives beyond a single graph run.
 **Outcome:** give the agent conversation continuity.
 
 *Design:* section 7, fact 5.
+
+**What was built (small on purpose)**
+
+| Change | Where |
+|---|---|
+| `compile({ checkpointer: new MemorySaver() })`: the state is saved after every step under a `thread_id` | `agent.ts` |
+| `runAgent(input, threadId)` replaces `runAgent(input, history)`. It sends only the new question; the earlier messages are loaded from the thread | `agent.ts` |
+| `callModel` sends the model the current question whole plus the last 6 earlier messages (`messagesForModel`, using `trimMessages` with `startOn: "human"`). The saved history is not cut | `agent.ts` |
+| `toolErrors` now **replaces** instead of adds, and `runAgent` sends `toolErrors: 0` with each question | `state.ts`, `tool-node.ts` |
+| Step counting finds the last human message instead of using `history.length` | `agent.ts` |
+
+**Concepts**
+
+- **Checkpointer** = the saved copy of the whole state after each step. `MemorySaver` keeps it in the process, so a restart loses it (a database checkpointer would survive; same API).
+- **`thread_id`** = which conversation. Same id continues it; a new id starts empty. It goes in `configurable`, not in the state.
+- **Short-term memory** = the state of one thread (what Phase 4 built). **Long-term memory** = facts kept across threads (for example a user's preferences). That needs a separate store and is not built here; it is not the checkpointer's job.
+- **Everything in the state persists, not only `messages`.** `toolErrors` was a running total, so failures from one question would have counted against the next. That is why it became "replace" and is reset per question. `searchCount` and `searchQueries` now add up over the whole thread, which is fine for a conversation total.
+- **Trimming** drops old messages from what the model sees (cheap, may forget). **Summarising** replaces old messages with a model-written summary (keeps the gist, costs an extra model call). Only trimming is built. `startOn: "human"` matters: without it the kept part can start with a tool result whose request was cut, which the API rejects (checked offline with `trimMessages`: max 5 without `startOn` started at `AI(tools) > tool`; with it, the kept part starts at a human message).
+- **The current question is never trimmed.** `messagesForModel` (`agent.ts`) trims only the messages before the last human message and sends the current question whole. Trimming everything (the first version) sent the model nothing when one question used 7 messages with a limit of 6, and made it forget the earlier question halfway through a tool loop.
+
+**Real run** (`npm run langgraph`, no Qdrant needed):
+
+| Thread | Question | Answer |
+|---|---|---|
+| a | What is 48213 * 317? | 15,283,521 (used `calculate`; 4 saved messages) |
+| a | Now divide that result by 3. | 5,094,507 (sent 7 saved messages, so it knew "that result"; 8 saved) |
+| b | Now divide that result by 3. | "Please provide the arithmetic expression…" (sent 1 message, no memory) |
+
+The history grows with tool messages (4 messages for the first question, 8 after the second); that is the cost the trim limits.
 
 ---
 
@@ -792,7 +821,7 @@ Items are checked off as phases complete.
 - [x] No `any` in `src/langgraph/`; lint clean for the files there.
 - [x] The state can be seen after every node and explained. *(Phase 2: the `· state:` log lines and `AgentState`)*
 - [x] A failed tool call is handled and the model recovers; stopping conditions are tested. *(Phase 3: `tests/test-tool-node.ts`, plus real runs recorded in section 10)*
-- [ ] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4)*
+- [x] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4: `tests/test-memory.ts` and the demo in `agent-index.ts`)*
 - [ ] A risky tool pauses for approval and resumes on the same thread. *(Phase 5)*
 - [ ] Tokens and tool progress stream separately; Ctrl+C cancels a run, including a running tool. *(Phase 6)*
 - [ ] Independent queries run in parallel and their results are combined; a run can be replayed and forked. *(Phase 7)*

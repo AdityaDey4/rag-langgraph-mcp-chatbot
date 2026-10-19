@@ -1,6 +1,7 @@
 
 import {
   StateGraph,
+  MemorySaver,
   GraphRecursionError,
   START,
   END,
@@ -11,6 +12,7 @@ import {
   AIMessage,
   SystemMessage,
   HumanMessage,
+  trimMessages,
   type BaseMessage,
 } from "@langchain/core/messages";
 
@@ -35,16 +37,33 @@ const model = new ChatOpenAI({
 // 2. Make all five tools available to the LLM (means llm can request these tools; it never runs them)
 const modelWithTools = model.bindTools(tools);
 
+// Of the earlier questions, only the last MAX_MESSAGES messages (starting at a human message) are sent to the model.
+// The current question is always sent whole, and the saved history is not cut.
+const MAX_MESSAGES = 6;
+
+// Example: with 10 saved messages where the current question starts at message 9, returns the last earlier messages (from a human message on) plus messages 9 and 10
+export async function messagesForModel(saved: BaseMessage[]): Promise<BaseMessage[]> {
+  const current = saved.findLastIndex((message) => message instanceof HumanMessage); // where this question starts
+  const earlier = await trimMessages(saved.slice(0, current), {
+    strategy: "last",
+    maxTokens: MAX_MESSAGES,
+    tokenCounter: (list) => list.length, // count messages instead of tokens
+    startOn: "human", // never start in the middle of a tool call
+  });
+  return [...earlier, ...saved.slice(current)];
+}
+
 // 3. LLM node: generate a response or request tools
 // Example return: { messages: [ AIMessage("Kafka is …") ], searchCount: 0, searchQueries: [], lastAnswer: "Kafka is …" }
 async function callModel(state: typeof AgentState.State) {
   log(`state: ${describeState(state)}`);
-  log(`llm: sending ${state.messages.length + 1} messages to ${CHAT_MODEL} (system prompt + ${state.messages.length} conversation, last message from "${state.messages.at(-1)?.getType()}")`);
-  state.messages.forEach((message, index) => log(`  ${index + 1}. ${describe(message)}`));
+  const messages = await messagesForModel(state.messages);
+  log(`llm: sending ${messages.length + 1} messages to ${CHAT_MODEL} (system prompt + ${messages.length} of ${state.messages.length} saved messages, last message from "${messages.at(-1)?.getType()}")`);
+  messages.forEach((message, index) => log(`  ${index + 1}. ${describe(message)}`));
 
   const response = await modelWithTools.invoke([
     new SystemMessage(SYSTEM_PROMPT),
-    ...state.messages,
+    ...messages,
   ]);
 
   const usage = response.usage_metadata;
@@ -85,7 +104,7 @@ function shouldContinue(state: typeof AgentState.State) {
 }
 
 // 6. Build and compile the graph
-// The state is AgentState (see state.ts): nodes return updates, and each field's reducer merges them in.
+// The checkpointer saves the state after every step under a thread_id. It lives in memory, so it is lost when the process stops.
 export const graph = new StateGraph(AgentState)
   .addNode("llm", callModel)
   .addNode("tools", runTools)
@@ -100,35 +119,37 @@ export const graph = new StateGraph(AgentState)
     giveUp: "giveUp",
   })
   .addEdge("giveUp", END)
-  .compile();
+  .compile({ checkpointer: new MemorySaver() });
 
 // 7. Export a reusable function for your application
-// Example: runAgent("What documents are available?") returns "There is one document available: school.pdf …"
+// Same threadId = same conversation: earlier messages are loaded from the checkpointer.
+// Example: runAgent("What is Kafka?", "thread-a") returns "Apache Kafka is a distributed …"; a later runAgent("Summarize that", "thread-a") knows what "that" is
 export async function runAgent(
   input: string,
-  history: BaseMessage[] = [],
+  threadId: string,
   recursionLimit = 6,
 ) {
   try {
     const result = await graph.invoke(
       {
-        messages: [
-          ...history,
-          new HumanMessage(input),
-        ],
+        messages: [new HumanMessage(input)], // appended to the saved history
+        toolErrors: 0, // a new question starts with no failures
       },
       {
         recursionLimit,
+        configurable: { thread_id: threadId },
       },
     );
 
     // Every model call is one step and every tools run is one step (the give-up node counts like a model call).
-    const thisRun = result.messages.slice(history.length + 1); // without the history and your question
+    const lastQuestion = result.messages.findLastIndex((message) => message instanceof HumanMessage);
+    const thisRun = result.messages.slice(lastQuestion + 1); // only the messages of this question
     const modelCalls = thisRun.filter((message) => message instanceof AIMessage);
     const toolRuns = modelCalls.filter((message) => message.tool_calls?.length);
     // A run that takes N steps only finishes if the limit is at least N + 1.
-    log(`Model calls: ${modelCalls.length}, tool runs: ${toolRuns.length}, total steps: ${modelCalls.length + toolRuns.length}, recursion limit: ${recursionLimit}`);
+    log(`Thread: ${threadId}, saved messages: ${result.messages.length}, model calls: ${modelCalls.length}, tool runs: ${toolRuns.length}, total steps: ${modelCalls.length + toolRuns.length}, recursion limit: ${recursionLimit}`);
 
+    log(`===============================================================================`)
     return result.lastAnswer;
   } catch (error) {
     // The graph ran more steps than recursionLimit allows, so LangGraph stopped it.
