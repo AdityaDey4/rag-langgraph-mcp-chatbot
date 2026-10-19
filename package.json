@@ -18,9 +18,9 @@
     "agent:behaviour": "tsx src/scripts/agent-behaviour.ts",
     "agent:experiments": "tsx src/scripts/agent-experiments.ts",
     "test:langgraph-tools": "tsx src/langgraph/tests/test-tools.ts",
-    "test:langgraph-agent": "tsx src/langgraph/agent-index.ts",
     "langgraph": "tsx src/langgraph/agent-index.ts",
-    "test:langgraph-state": "tsx src/langgraph/tests/test-state.ts"
+    "test:langgraph-state": "tsx src/langgraph/tests/test-state.ts",
+    "test:langgraph-tool-node": "tsx src/langgraph/tests/test-tool-node.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.18",

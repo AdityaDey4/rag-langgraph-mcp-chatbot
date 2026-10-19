@@ -67,6 +67,7 @@ async function main() {
 
     assert.equal(result.searchCount, 0);
     assert.deepEqual(result.searchQueries, []);
+    assert.equal(result.toolErrors, 0);
     assert.equal(result.lastAnswer, "");
   });
 

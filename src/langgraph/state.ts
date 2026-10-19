@@ -16,6 +16,12 @@ export const AgentState = Annotation.Root({
     default: () => [],
   }),
 
+  // Number of tool calls that failed. Added up. The agent gives up when it reaches 3 (see tool-node.ts)
+  toolErrors: Annotation<number>({
+    reducer: (current, update) => current + update,
+    default: () => 0,
+  }),
+
   // Replaced. Example: current "x", update "y" gives "y"
   lastAnswer: Annotation<string>({
     reducer: (_current, update) => update,

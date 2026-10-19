@@ -1,57 +1,29 @@
 
 import {
   StateGraph,
+  GraphRecursionError,
   START,
   END,
 } from "@langchain/langgraph";
 
-import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 import {
   AIMessage,
   SystemMessage,
   HumanMessage,
-  ToolMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
 
 import { CHAT_MODEL } from "./config";
+import { describe, log, shorten } from "./log";
 import { SYSTEM_PROMPT } from "./prompt";
 import { AgentState } from "./state";
+import { afterTools, giveUp, runTools } from "./tool-node";
 import { tools } from "./tools";
 
-// Lines starting with "·" log what goes into the model and where the graph turns.
-// Turn them off with LANGGRAPH_LOG=off.
-const LOGGING_ON = process.env.LANGGRAPH_LOG !== "off";
-
-// Example: log("llm: sending 2 messages") prints "   · llm: sending 2 messages"
-function log(text: string) {
-  if (LOGGING_ON) console.log(`   · ${text}`);
-}
-
-// Example: shorten("<tool_result>[ 1, 2 ]</tool_result>") returns "[ 1, 2 ]"
-function shorten(text: string, max = 150): string {
-  const flat = text.replace(/<\/?tool_result[^>]*>/g, "").replace(/\s+/g, " ").trim();
-  return flat.length > max ? flat.slice(0, max) + "…" : flat;
-}
-
-// Example: describe(aiMessage) returns 'ai: asks for 1 tool(s) -> search_documents {"query":"Kafka"}'
-function describe(message: BaseMessage): string {
-  const text = shorten(typeof message.content === "string" ? message.content : JSON.stringify(message.content));
-
-  if (message instanceof AIMessage && message.tool_calls?.length) {
-    const calls = message.tool_calls.map((call) => `${call.name} ${JSON.stringify(call.args)}`).join(" | ");
-    return `ai: asks for ${message.tool_calls.length} tool(s) -> ${calls}` + (text ? ` (text: "${text}")` : "");
-  }
-  if (message instanceof ToolMessage) {
-    return `tool (${message.name}, ${message.status ?? "success"}): ${text}`;
-  }
-  return `${message.getType()}: "${text}"`;
-}
-
-// Example: describeState(state) returns 'searchCount=1, searchQueries=["Kafka"], lastAnswer=""'
+// Example: describeState(state) returns 'searchCount=1, searchQueries=["Kafka"], toolErrors=0, lastAnswer=""'
 function describeState(state: typeof AgentState.State): string {
-  return `searchCount=${state.searchCount}, searchQueries=${JSON.stringify(state.searchQueries)}, lastAnswer="${shorten(state.lastAnswer, 40)}"`;
+  return `searchCount=${state.searchCount}, searchQueries=${JSON.stringify(state.searchQueries)}, toolErrors=${state.toolErrors}, lastAnswer="${shorten(state.lastAnswer, 40)}"`;
 }
 
 // 1. Initialize the LLM
@@ -60,7 +32,7 @@ const model = new ChatOpenAI({
   temperature: 0,
 });
 
-// 2. Make all five tools available to the LLM (means llm can request these tools)
+// 2. Make all five tools available to the LLM (means llm can request these tools; it never runs them)
 const modelWithTools = model.bindTools(tools);
 
 // 3. LLM node: generate a response or request tools
@@ -91,8 +63,7 @@ async function callModel(state: typeof AgentState.State) {
   };
 }
 
-// 4. Tool node: execute requested tools
-const toolNode = new ToolNode(tools);
+// 4. Tool node: execute requested tools (runTools in tool-node.ts, which replaces the ready-made ToolNode)
 
 // 5. Conditional routing: tools or final answer
 // Example return: "tools" if the model asked for a tool, otherwise END
@@ -117,13 +88,18 @@ function shouldContinue(state: typeof AgentState.State) {
 // The state is AgentState (see state.ts): nodes return updates, and each field's reducer merges them in.
 export const graph = new StateGraph(AgentState)
   .addNode("llm", callModel)
-  .addNode("tools", toolNode)
+  .addNode("tools", runTools)
+  .addNode("giveUp", giveUp)
   .addEdge(START, "llm")
   .addConditionalEdges("llm", shouldContinue, {
     tools: "tools",
     [END]: END,
   })
-  .addEdge("tools", "llm")
+  .addConditionalEdges("tools", afterTools, {
+    llm: "llm",
+    giveUp: "giveUp",
+  })
+  .addEdge("giveUp", END)
   .compile();
 
 // 7. Export a reusable function for your application
@@ -131,18 +107,34 @@ export const graph = new StateGraph(AgentState)
 export async function runAgent(
   input: string,
   history: BaseMessage[] = [],
+  recursionLimit = 6,
 ) {
-  const result = await graph.invoke(
-    {
-      messages: [
-        ...history,
-        new HumanMessage(input),
-      ],
-    },
-    {
-      recursionLimit: 15,
-    },
-  );
+  try {
+    const result = await graph.invoke(
+      {
+        messages: [
+          ...history,
+          new HumanMessage(input),
+        ],
+      },
+      {
+        recursionLimit,
+      },
+    );
 
-  return result.lastAnswer;
+    // Every model call is one step and every tools run is one step (the give-up node counts like a model call).
+    const thisRun = result.messages.slice(history.length + 1); // without the history and your question
+    const modelCalls = thisRun.filter((message) => message instanceof AIMessage);
+    const toolRuns = modelCalls.filter((message) => message.tool_calls?.length);
+    // A run that takes N steps only finishes if the limit is at least N + 1.
+    log(`Model calls: ${modelCalls.length}, tool runs: ${toolRuns.length}, total steps: ${modelCalls.length + toolRuns.length}, recursion limit: ${recursionLimit}`);
+
+    return result.lastAnswer;
+  } catch (error) {
+    // The graph ran more steps than recursionLimit allows, so LangGraph stopped it.
+    if (error instanceof GraphRecursionError) {
+      return `I stopped because the step limit (${recursionLimit}) was reached before I could finish. Please try a simpler question.`;
+    }
+    throw error;
+  }
 }

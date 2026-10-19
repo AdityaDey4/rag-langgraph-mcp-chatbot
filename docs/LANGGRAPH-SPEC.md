@@ -4,11 +4,15 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.5, 2026-10-18. **Phases 1 and 2 are done** (graph fundamentals; state and reducers); Phase 3 (tool calling and agent loops) is next |
+| **Status** | Draft v0.6, 2026-10-19. **Phases 1 to 3 are done** (graph fundamentals; state and reducers; tool calling and agent loops); Phase 4 (persistence and memory) is next |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
 | **Not a goal** | Replacing the hand-built agent, or integrating with the web app. |
+
+### What changed in v0.6
+
+**Phase 3 (tool calling and agent loops) is done.** The ready-made `ToolNode` was replaced once by a hand-written tools node (`runTools` in `tool-node.ts`) so the failure handling is visible: a failing tool, invalid arguments or an unknown tool name all become an error message the model can read and recover from. A new `toolErrors` state field counts failures, and when it reaches 3 the graph goes to a `giveUp` node instead of back to the model. `runAgent` now catches the recursion limit and returns a friendly message. The practical task and the real runs are recorded in section 10.
 
 ### What changed in v0.5
 
@@ -80,7 +84,7 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 | 1 | `StateSchema` + `MessagesValue` + prebuilt `ToolNode` + a conditional edge form a working agent loop | 1 |
 | 2 | `graph.stream(input, { signal })` aborts the run, including a tool that is mid-flight (~300 ms) | 6 |
 | 3 | `recursionLimit` stops an infinite loop with `GraphRecursionError` (default 25) | 1, 3 |
-| 4 | **`recursionLimit = 2 × N` allows exactly N model calls**, each followed by a tools run | 1, 3 |
+| 4 | In a loop that **never ends**, `recursionLimit = 2 × N` lets exactly N model calls run, each followed by a tools run, before `GraphRecursionError` | 1, 3 |
 | 5 | `MemorySaver` + `configurable.thread_id` keeps history per thread and isolates threads | 4 |
 | 6 | `streamMode: [...]` yields `[mode, chunk]` tuples | 6 |
 | 7 | `custom` mode: a node's `config.writer(x)` reaches the caller, in order with `updates` | 6 |
@@ -99,6 +103,9 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 | 20 | `addMessages(existing, added)` **appends**; a message with the **same id replaces** the old one; a message without an id is **given one**; a plain `{ role, content }` object becomes a real message | 2 ✅ |
 | 21 | With `streamMode: ["updates", "values"]` the order is: one `values` (the state made from the input), then for each node an `updates` (only what it returned) followed by a `values` (the whole state after the merge) | 6 (verified early, not used in Phase 2) |
 | 22 | A `ToolMessage` carries the `tool_call_id` of the AI message's tool call that it answers, which is how results are matched to requests | 2 ✅ |
+| 23 | `tool.invoke({ ...toolCall, type: "tool_call" })` checks the arguments against the schema, runs the tool, and returns a `ToolMessage` with the same `tool_call_id` and name. A failing tool or invalid arguments make it **throw**. (Without `type: "tool_call"` the object is treated as the tool's arguments.) | 3 ✅ |
+| 24 | `ToolNode`'s only error option is `handleToolErrors` (on or off). Writing the node by hand allows custom error text and updating the state (for example a failure counter) | 3 ✅ |
+| 25 | **A run that finishes after S steps needs `recursionLimit` of at least S + 1.** A 1-step greeting fails at limit 1 and passes at 2; a 3-step run (model, tools, model) fails at 3 and passes at 4. So with the default 15, a run can finish with at most 7 model calls (13 steps), not 8 | 1, 3 ✅ |
 
 **Worth knowing:**
 
@@ -164,7 +171,7 @@ The code so far follows these rules: every source file is about 105 lines or few
 | `for (;;)` loop | Edges: `llm → router → tools → llm` | Free (structure) | 1 ✅ |
 | `if (reply.toolCalls.length === 0) return` | Router (conditional edge) → `END` | Ours (about 5 lines) | 1 ✅ |
 | `callModel` (stream OpenAI) | `ChatOpenAI.bindTools(tools)` inside the `llm` node | Free | 1 ✅ |
-| Parallel tool execution, error → message | Prebuilt `ToolNode` | Free in Phase 1; Phase 3 decides whether to replace it | 3 |
+| Parallel tool execution, error → message | Our own tools node, `runTools` (about 25 lines): runs the calls side by side, turns failures into error messages | Ours (the ready-made `ToolNode` does the same without custom error text or state updates) | 3 ✅ |
 | `registry.call` (validate, timeout, truncate, wrapper) | Tool arguments are validated by LangChain; errors become messages through `ToolNode`; the wrapper is one helper; timeouts and truncation arrive in Phases 3 and 8 | Mixed | 3, 8 |
 | `maxSteps` | Router counter; `recursionLimit = 2 × maxSteps + 4` as a backstop | Mixed | 3 |
 | `maxToolCalls`, `maxTokens`, total time | State counters (`ReducedValue`) checked in the router | Ours | 2, 3 |
@@ -184,7 +191,14 @@ The code so far follows these rules: every source file is about 105 lines or few
 
 ## 5. The graph
 
-The shape the agent grows towards:
+**Built so far** (Phase 3, in `agent.ts` and `tool-node.ts`):
+
+```
+START ──▶ llm ──▶ router ──┬── model asked for tools ──▶ tools ──▶ afterTools ──┬── fewer than 3 failures ──▶ llm
+                           └── model answered ─────────▶ END                    └── 3 failures ──▶ giveUp ──▶ END
+```
+
+The shape it may grow towards, with budgets and a forced final answer (later phases):
 
 ```
                     ┌───────────────────────────────────────────────┐
@@ -193,8 +207,6 @@ START ──▶ llm ────▶ router ──┬── tool calls, budgets O
                              ├── no tool calls ───────────────────────▶ finalize ──▶ END
                              └── a budget was hit ──▶ forceAnswer ───▶ finalize
 ```
-
-**Built in Phase 1** (the minimal version, in `agent.ts`): `llm`, a prebuilt `ToolNode` called `tools`, and a two-way router (`tools` or `END`). `forceAnswer` and `finalize` arrive in Phase 3.
 
 ### State
 
@@ -225,7 +237,8 @@ Exact field syntax follows the installed types (re-check when this is built). Pe
 | Node | Job |
 |---|---|
 | `llm` | `ChatOpenAI` with tools bound, system prompt = `SYSTEM_PROMPT`. Returns the AI message |
-| `tools` | **Phase 1:** prebuilt `ToolNode`. **Phase 3:** possibly a custom node: repeat guard, tool-call budget, parallel tool calls |
+| `tools` | `runTools` (Phase 3): runs the tool calls, returns one `ToolMessage` per call, counts failures in `toolErrors`. (Phase 1 used the ready-made `ToolNode`.) |
+| `giveUp` | Phase 3: when 3 tool calls have failed, answers with a message saying so instead of calling the model again |
 | `forceAnswer` | Same model with **no tools**, plus a forced-answer note (Phase 3) |
 | `finalize` | Removes citations of passages that were not retrieved; sets the final answer (Phase 3) |
 
@@ -238,7 +251,7 @@ else if last message has tool_calls               → "tools"
 else                                              → "finalize"
 ```
 
-Phase 1 has only the last two branches (`tools` or `END`). Budgets are checked **explicitly in the router**. `recursionLimit` is only a backstop: hitting it throws `GraphRecursionError` and loses the in-flight state (fact 4 gives the arithmetic).
+Today only the last two branches exist (`tools` or `END`), plus a second router, `afterTools`, that sends the graph to `giveUp` once 3 tool calls have failed (Phase 3). Budgets are checked **explicitly in the router**. `recursionLimit` is only a backstop: hitting it throws `GraphRecursionError` and loses the in-flight state (fact 4 gives the arithmetic).
 
 ### The tools (groundwork, done before Phase 1)
 
@@ -295,6 +308,8 @@ src/langgraph/
   agent.ts               ✅ the graph: model node, tool node, router (with step-by-step logging)
   agent-index.ts         ✅ run it:  npm run langgraph -- "question"
   state.ts               ✅ Phase 2: AgentState, the fields and their reducers
+  tool-node.ts           ✅ Phase 3: the tools node (runTools) and the give-up logic
+  log.ts                 ✅ the "·" log helper
   config.ts              ✅ model and collection names
   prompt.ts              ✅ system prompt + untrusted-data wrapper
   retrieval.ts           ✅ search / fetch one passage / list documents (Qdrant)
@@ -302,6 +317,7 @@ src/langgraph/
   tests/
     test-tools.ts        ✅ the tools, plus the "stands alone" check
     test-state.ts        ✅ Phase 2: each state field and its reducer
+    test-tool-node.ts    ✅ Phase 3: running tools, failures, giving up
   --- planned, not present now ---
   testing/scripted-model.ts, tests/test-graph.ts   Fake model + graph tests (Phase 3)
   cli.ts                 The richer terminal interface in section 6 (Phases 3 to 7)
@@ -309,7 +325,7 @@ docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers).
+npm scripts: `langgraph` (run the agent), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -322,7 +338,9 @@ Each guardrail of the hand-built agent is rebuilt as state, nodes or edges, and 
 | Guardrail | Scenario | Phase |
 |---|---|---|
 | No tools for a greeting | Model replies with text only → 0 tool calls | 1 ✅ (seen in the traces) |
-| Bad arguments become an error result | Invalid args → model recovers next turn | 3 |
+| Bad arguments become an error result | Invalid args → error message the model can read and recover from | 3 ✅ (`test-tool-node.ts`) |
+| Too many failed tool calls → stop | 3 failures → the graph goes to `giveUp` instead of back to the model | 3 ✅ |
+| Step limit (`recursionLimit`) → friendly message | LangGraph stops the run; `runAgent` returns a message instead of crashing | 3 ✅ (checked by running it) |
 | Step budget → forced answer | Model keeps calling tools → `stopReason: max_steps`, the last model call has no tools | 3 |
 | Tool-call budget | Extra calls get an error result | 3 |
 | Repeat guard | Identical call served from cache; third repeat forces an answer | 3 |
@@ -343,8 +361,8 @@ The scripted model records every request, so tests can assert what the model was
 |---|---|---|
 | 1 | Graph fundamentals | ✅ **Done** |
 | 2 | State and reducers | ✅ **Done** |
-| 3 | Tool calling and agent loops | ⏭️ **Next** |
-| 4 | Persistence and memory | ⬜ |
+| 3 | Tool calling and agent loops | ✅ **Done** |
+| 4 | Persistence and memory | ⏭️ **Next** |
 | 5 | Human-in-the-loop | ⬜ |
 | 6 | Streaming and observability | ⬜ |
 | 7 | Advanced graph patterns | ⬜ |
@@ -390,7 +408,9 @@ flowchart LR
 
 **Execution order** is decided only by these edges. After a node finishes, LangGraph follows the edge out of it: a fixed edge always goes to the same node, a conditional edge asks the router function which node comes next.
 
-**Loops and recursion limits.** The loop is `llm → tools → llm → …`. Every node run counts as one step against `recursionLimit` (set to 15 in `runAgent`). A round of the loop uses two steps (`llm` plus `tools`), so 15 steps allow at most 8 model calls (fact 4). Going over the limit throws `GraphRecursionError` and loses the run in progress, so it is a safety net against runaway loops, not a normal way to stop.
+**Loops and recursion limits.** The loop is `llm → tools → llm → …`. Every node run counts as one step against `recursionLimit` (set to 15 in `runAgent`). A round of the loop uses two steps (`llm` plus `tools`). A run that takes S steps only finishes if the limit is at least S + 1 (fact 25), so with 15 a run can finish with at most 7 model calls. Going over the limit throws `GraphRecursionError` and loses the run in progress, so it is a safety net against runaway loops, not a normal way to stop.
+
+*Phase 3 later changed this graph: the `tools` node is now our own `runTools`, and the edge out of it is conditional (it can lead to a `giveUp` node). Phase 1 is described as it was built.*
 
 #### The three traces (the practical task)
 
@@ -545,9 +565,9 @@ How each field got its value:
 
 ---
 
-### Phase 3: Tool calling and agent loops ⏭️ *next lesson*
+### Phase 3: Tool calling and agent loops ✅
 
-Build on the five existing tools.
+**Build on the five existing tools.**
 
 - `bindTools()` versus `ToolNode`
 - Tool-call arguments and IDs
@@ -559,11 +579,66 @@ Build on the five existing tools.
 
 **Outcome:** build a reliable tool-using agent, not just a chatbot.
 
-*Design:* sections 4 and 9 (guardrails), facts 3, 4, 15 and 16.
+**What was built:** `tool-node.ts` (the tools node `runTools`, plus `afterTools` and `giveUp`), `log.ts` (the log helper, moved out of `agent.ts` so the new file can use it), a `toolErrors` field in `state.ts`, changes to `agent.ts` (the graph and `runAgent`), and `tests/test-tool-node.ts` (8 tests, no network). Design: sections 4, 5 and 9.
+
+#### `bindTools()` versus `ToolNode`
+
+| | `model.bindTools(tools)` | the tools node (`runTools`, or the ready-made `ToolNode`) |
+|---|---|---|
+| What it does | Tells the model which tools exist: each tool's name, description and argument schema are sent with every request | Runs the tool calls the model asked for |
+| Where | the `llm` node (`modelWithTools` in `agent.ts`) | the `tools` node |
+| Produces | the model *can ask*: an `AIMessage` with `tool_calls` | one `ToolMessage` per call |
+
+The model never runs anything. It only asks. Everything that actually happens, including every failure, happens in the tools node.
+
+#### A tool call, step by step
+
+1. The model's reply contains `tool_calls`, a list of `{ id, name, args }`. The `id` (for example `call_B7XcsqU…`) is how the result is matched to the request. `args` is already a parsed object.
+2. `runTools` finds the tool by `name` and calls `tool.invoke({ ...call, type: "tool_call" })` (fact 23). The tool checks `args` against its schema, runs, and returns a `ToolMessage` with the same `tool_call_id`.
+3. **Several calls in one reply** run side by side (`Promise.all`). Results come back in the order of the calls, even though they finish in any order: in a real run the calculator logged before the document listing although it was requested second.
+
+#### When a tool fails
+
+| What went wrong | Where it is caught | Result |
+|---|---|---|
+| The tool throws (`1 / 0`, an unknown chunk id, Qdrant unreachable) | `try/catch` in `runOne` | error message |
+| The arguments are invalid (wrong type, missing field) | the same `try/catch`: the tool throws before running | error message that names the wrong field |
+| The model asks for a tool that does not exist | the `toolsByName` lookup | error message listing the real tools |
+
+Every case becomes a `ToolMessage` with `status: "error"`, **the same `tool_call_id`** as the request, and this text for the model: `Error: <what went wrong>` followed by `You may fix the arguments and try again, or explain the problem to the user.` Nothing crashes. The model reads the error and decides: retry, use another tool, or explain. A failure in one call does not stop the other calls in the same step. `toolErrors` goes up by the number of failed calls.
+
+Real runs (with the `· tools:` log lines):
+
+- **`"What is 10 / 0?"`**: `calculate` fails with `Division by zero`, and the model explains that division by zero is undefined. `toolErrors=1`.
+- **`"Show me the passage with chunk id abc123, and if that does not work tell me what Kafka is."`**: `get_chunk` fails, the model then calls `search_documents` for "Kafka", and answers correctly. It recovered by choosing a different tool. `toolErrors` stayed at 1.
+
+#### Stopping conditions
+
+An agent loop needs a way out when the model keeps going. Two are in place:
+
+| Condition | Where | What happens |
+|---|---|---|
+| **3 tool calls have failed** (`MAX_TOOL_ERRORS`) | the `afterTools` router, which runs after the tools node | goes to the `giveUp` node instead of back to the model; the answer is "I stopped because 3 tool calls failed. Please try rephrasing the question." and the model is not called again |
+| **Step limit** (`recursionLimit`, default 15) | LangGraph | `runAgent` catches `GraphRecursionError` and returns "I stopped because the step limit (N) was reached…". Each loop round uses two steps, and a run of S steps needs a limit of at least S + 1, so 15 lets a run finish with at most 7 model calls |
+
+Real runs:
+
+- **`"Fetch the passages with chunk ids 111, 222 and 333 and show me their full text."`**: the model asked for three `get_chunk` calls at once, all three failed, `afterTools` returned `"giveUp"`, and the run ended with the give-up message. The model was not called a second time.
+- **`runAgent("What is 48213 * 317?", [], limit)`**: this run takes 3 steps (model, tools, model). With `limit` 1, 2 or 3 it returns the step-limit message; with 4 or more it answers (15,283,521). So a limit equal to the steps used is **not** enough (fact 25). After a successful answer, `runAgent` logs `done: 3 steps used, recursion limit is 15`.
+
+The failure limit is checked *after the tools have run*, not before. That way every tool call the model made has its `ToolMessage`. A conversation with a tool request that was never answered is rejected by the model API if it is ever sent back.
+
+#### What to notice
+
+- **A failing tool is just another message.** The model recovers by reading it. There is no special recovery code, only a clear error text.
+- **"Retry" means the model deciding to call again.** There is no automatic retry. Automatic retries of a node (`retryPolicy`) belong to Phase 7.
+- **`toolErrors` counts failures over the whole run**, not consecutive ones; a success does not reset it. This keeps the rule simple.
+- **Error text quality matters.** `get_chunk` with a non-UUID id returns only `Bad Request` (Qdrant's message), and the model still recovered, but "no passage with that id" would be clearer. The tool was not changed.
+- **A custom node can update the state; `ToolNode` cannot** (fact 24). That is why `toolErrors` could be added at all.
 
 ---
 
-### Phase 4: Persistence and memory
+### Phase 4: Persistence and memory ⏭️ *next lesson*
 
 Learn how information survives beyond a single graph run.
 
@@ -686,7 +761,7 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 
 ### Open decisions (record in the notes)
 
-1. Keep `ToolNode` after Phase 3, or always use a custom `tools` node (default: try replacing it once and compare).
+1. ~~Keep `ToolNode` after Phase 3, or always use a custom `tools` node.~~ **Decided in Phase 3: the custom `runTools` node replaced `ToolNode`.** It is about 25 lines and gives control over error text and state updates.
 2. How far to go in Phase 7 (fan-out, subgraphs, node caching): all of it, or only parallel branches.
 3. Whether to run the Phase 8 comparison at all, or keep the notes qualitative.
 4. ~~`MessagesAnnotation` or `StateSchema` + `MessagesValue`?~~ **Decided in Phase 2: `Annotation.Root` with `MessagesAnnotation.spec`**, as in the curriculum. It works in the installed version. The current docs prefer `StateSchema`; revisit if that changes.
@@ -716,7 +791,7 @@ Items are checked off as phases complete.
 - [x] `src/langgraph/` imports nothing from outside itself (enforced by a test).
 - [x] No `any` in `src/langgraph/`; lint clean for the files there.
 - [x] The state can be seen after every node and explained. *(Phase 2: the `· state:` log lines and `AgentState`)*
-- [ ] A failed tool call is handled and the model recovers; stopping conditions are tested against a scripted model. *(Phase 3, section 9)*
+- [x] A failed tool call is handled and the model recovers; stopping conditions are tested. *(Phase 3: `tests/test-tool-node.ts`, plus real runs recorded in section 10)*
 - [ ] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4)*
 - [ ] A risky tool pauses for approval and resumes on the same thread. *(Phase 5)*
 - [ ] Tokens and tool progress stream separately; Ctrl+C cancels a run, including a running tool. *(Phase 6)*
