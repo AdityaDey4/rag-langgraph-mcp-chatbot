@@ -3,7 +3,7 @@
 import { AIMessage, ToolMessage } from "@langchain/core/messages";
 import type { ToolCall } from "@langchain/core/messages/tool";
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import { describe, log, shorten } from "./log";
+import { log } from "./log";
 import type { AgentState } from "./state";
 import { tools } from "./tools";
 
@@ -17,7 +17,7 @@ export async function runTools(state: typeof AgentState.State) {
   const results = await Promise.all((lastMessage.tool_calls ?? []).map(runOne)); // the calls run side by side
   const failed = results.filter((result) => result.status === "error").length;
 
-  log(`Last Message: ${describe(lastMessage)} -> ${results.length} tool calls completed, ${failed} failed`);
+  // log(`Last Message: ${describe(lastMessage)} -> ${results.length} tool calls completed, ${failed} failed`);
   return {
     messages: results,
     toolErrors: state.toolErrors + failed,
@@ -40,7 +40,7 @@ async function runOne(call: ToolCall): Promise<ToolMessage> {
     }
   }
 
-  log(`tools: ${call.name} ${JSON.stringify(call.args)} (id ${call.id?.slice(0, 12)}) -> ${result.status}: ${shorten(String(result.content), 100)}`);
+  // log(`tools: ${call.name} ${JSON.stringify(call.args)} (id ${call.id?.slice(0, 12)}) -> ${result.status}: ${shorten(String(result.content), 100)}`);
   return result;
 }
 

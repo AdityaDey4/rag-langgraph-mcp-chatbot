@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { HumanMessage, AIMessage, ToolMessage, trimMessages } from "@langchain/core/messages";
 import { MemorySaver, StateGraph, START, END } from "@langchain/langgraph";
-import { messagesForModel } from "../agent";
+import { MAX_MESSAGES, messagesForModel } from "../agent";
 import { AgentState } from "../state";
 
 let passed = 0;
@@ -77,19 +77,19 @@ async function main() {
   ];
 
   await test("a question that needs many tool rounds is sent whole, never trimmed away", async () => {
-    const saved = [new HumanMessage("q"), ...toolRound("1"), ...toolRound("2"), ...toolRound("3")]; // 7 messages, more than the limit
-    assert.equal((await messagesForModel(saved)).length, 7);
+    const rounds = Array.from({ length: MAX_MESSAGES }, (_, n) => toolRound(`r${n}`)).flat(); // far more messages than the limit
+    const saved = [new HumanMessage("q"), ...rounds];
+    assert.ok(saved.length > MAX_MESSAGES);
+    assert.equal((await messagesForModel(saved)).length, saved.length);
   });
 
   await test("earlier questions are trimmed from the front, and the current one is kept", async () => {
-    const saved = [
-      new HumanMessage("q1"), ...toolRound("1"), new AIMessage("a1"),
-      new HumanMessage("q2"), ...toolRound("2"), new AIMessage("a2"),
-      new HumanMessage("q3"),
-    ];
-    const sent = await messagesForModel(saved);
-    assert.equal(sent[0].content, "q2"); // q1 and its tool round were dropped together
-    assert.equal(sent.at(-1)?.content, "q3");
+    const earlier = Array.from({ length: 10 }, (_, n) => [new HumanMessage(`q${n}`), ...toolRound(`e${n}`), new AIMessage(`a${n}`)]).flat(); // 40 messages
+    const sent = await messagesForModel([...earlier, new HumanMessage("current")]);
+    assert.ok(sent.length <= MAX_MESSAGES + 1);
+    assert.equal(sent[0].getType(), "human"); // never starts inside a tool call
+    assert.notEqual(sent[0].content, "q0"); // the oldest question was dropped
+    assert.equal(sent.at(-1)?.content, "current");
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

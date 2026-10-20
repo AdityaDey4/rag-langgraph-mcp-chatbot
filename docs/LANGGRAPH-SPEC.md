@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.8, 2026-10-19. **Phases 1 to 5 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop); Phase 6 (streaming and observability) is next |
+| **Status** | Draft v0.9, 2026-10-19. **Phases 1 to 6 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability); Phase 7 (advanced graph patterns) is next |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
@@ -104,14 +104,17 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 | 21 | With `streamMode: ["updates", "values"]` the order is: one `values` (the state made from the input), then for each node an `updates` (only what it returned) followed by a `values` (the whole state after the merge) | 6 (verified early, not used in Phase 2) |
 | 22 | A `ToolMessage` carries the `tool_call_id` of the AI message's tool call that it answers, which is how results are matched to requests | 2 ✅ |
 | 23 | `tool.invoke({ ...toolCall, type: "tool_call" })` checks the arguments against the schema, runs the tool, and returns a `ToolMessage` with the same `tool_call_id` and name. A failing tool or invalid arguments make it **throw**. (Without `type: "tool_call"` the object is treated as the tool's arguments.) | 3 ✅ |
-| 24 | `ToolNode`'s only error option is `handleToolErrors` (on or off). Writing the node by hand allows custom error text and updating the state (for example a failure counter) | 3 ✅ |
+| 28 | `graph.stream(input, { signal })` with the signal aborted mid-run throws an error named `AbortError`; `runAgent` catches it and returns "Cancelled." (1.5 s after the abort was scheduled, before the model had answered) | 6 ✅ |
+| 27 | The `llm` node's update message carries `usage_metadata` (input and output tokens) even though its tokens were streamed; a pause appears as an update chunk keyed `__interrupt__` | 6 ✅ |
+| 26 | In `messages` mode the **tools node also appears** (its `ToolMessage` text), so token streaming must filter on `langgraph_node === "llm"`. Tool-call fragments arrive with empty text and are skipped by the same check | 6 ✅ |
 | 25 | **A run that finishes after S steps needs `recursionLimit` of at least S + 1.** A 1-step greeting fails at limit 1 and passes at 2; a 3-step run (model, tools, model) fails at 3 and passes at 4. So with the default 15, a run can finish with at most 7 model calls (13 steps), not 8 | 1, 3 ✅ |
+| 24 | `ToolNode`'s only error option is `handleToolErrors` (on or off). Writing the node by hand allows custom error text and updating the state (for example a failure counter) | 3 ✅ |
 
 **Worth knowing:**
 
 - **Abort inside `ToolNode`.** The run's signal reaches a running tool, but `ToolNode` turns the abort into an *error message* rather than throwing. The graph runner itself raises `AbortError` at the next step, so code that streams a run should check for it.
 
-**Not verified yet:** token `usage_metadata` when a real `ChatOpenAI` is streamed through a graph (checked in Phase 6; the current logs do show it for non-streamed calls). `createAgent` (LangChain v1's prebuilt agent) is deliberately not used.
+`createAgent` (LangChain v1's prebuilt agent) is deliberately not used.
 
 **Naming rule:** state is written with `Annotation.Root` and `MessagesAnnotation.spec`, as the curriculum does; both still work in 1.5.0. `StateSchema` + `MessagesValue` is the newer equivalent in the current docs and is what the removed tests used. Follow the installed types over web examples.
 
@@ -325,7 +328,7 @@ docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent; with no question it runs the Phase 4 memory demo), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
+npm scripts: `langgraph` (run the agent with a question; streams the answer and shows progress), `test:langgraph-stream` (reading the stream), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -364,8 +367,8 @@ The scripted model records every request, so tests can assert what the model was
 | 3 | Tool calling and agent loops | ✅ **Done** |
 | 4 | Persistence and memory | ✅ **Done** |
 | 5 | Human-in-the-loop | ✅ **Done** |
-| 6 | Streaming and observability | ⏭️ **Next** |
-| 7 | Advanced graph patterns | ⬜ |
+| 6 | Streaming and observability | ✅ **Done** |
+| 7 | Advanced graph patterns | ⏭️ **Next** |
 | 8 | Production-ready agents | ⬜ |
 
 Each phase has a practical task and an outcome. The design details behind each phase are in the sections noted under it.
@@ -739,7 +742,7 @@ Edit was verified in `tests/test-approve.ts` (the tool runs with the new `to`). 
 
 ---
 
-### Phase 6: Streaming and observability
+### Phase 6: Streaming and observability ✅
 
 Make the agent easier to use and debug.
 
@@ -754,6 +757,50 @@ Make the agent easier to use and debug.
 **Outcome:** understand why an agent may take time, and show progress while it works.
 
 *Design:* section 6, facts 2, 6, 7, 8 and 18. Note that the web application and SSE are out of scope for this folder (section 13), so "the existing application" here means the terminal interface unless that scope is widened.
+
+**What was built**
+
+| Change | Where |
+|---|---|
+| `run` uses `graph.stream(input, { streamMode: ["updates", "messages"] })` instead of `invoke`. `updates` = one chunk per finished node; `messages` = the model's tokens | `agent.ts` |
+| `runAgent(input, threadId, { signal, onToken, onStep })`: `onToken` gets each piece of the answer, `onStep` gets each finished node | `agent.ts` |
+| `Step` = `{ node, detail, ms, inputTokens, outputTokens }`; every result carries `steps` (the execution trace) | `agent.ts` |
+| The terminal prints the answer word by word, one `▸` progress line per step with time and tokens, and a total line; Ctrl+C aborts the run | `agent-index.ts` |
+
+**Concepts**
+
+- **Two kinds of streaming.** *State updates* (`updates`): what each node returned, after it finished. *Tokens* (`messages`): pieces of the model's text as it writes them. Progress uses the first, the typing effect uses the second.
+- **A paused or finished run is the same stream.** The state is read afterwards with `getState` (final answer, pending approval), so the approval flow from Phase 5 did not change.
+- **Time per step** is measured between two `updates` chunks. The `approve` step is ~0 because the wait for the human happens between two streams (the resume starts a new one).
+- **Tokens per step** come from `usage_metadata` on the model's message (fact 27). Only the `llm` node uses tokens.
+
+**Real run** (`npm run langgraph -- "What is Kafka? Answer in one sentence."`)
+
+| Step | Time | Tokens |
+|---|---|---|
+| llm (asks for `search_documents`) | 1.5 s | 1294 in / 14 out |
+| approve (nothing risky) | 0.0 s | |
+| tools (`search_documents`) | **4.8 s** | |
+| llm (answer, streamed) | 1.5 s | 2387 in / 51 out |
+| **Total** | **7.8 s** | **3681 in / 65 out** |
+
+**Findings**
+
+- **Most of the wait was the tool, not the model.** The search (embedding plus Qdrant) took 4.8 s of 7.8 s. Without progress lines this looks like a frozen program.
+- **The second model call costs about twice the tokens of the first** (2387 against 1294), because the search results are now in the input. This is the cost of tool results in the history (also seen in Phase 4).
+- **Streaming only helps the last step.** The first `llm` step produces a tool call, not text, so the first visible text appears only after the search. Tokens streamed in the first run were tool-call fragments with empty text.
+
+**Review fixes** (found by a review after the first version, then fixed)
+
+| Problem | Fix |
+|---|---|
+| **The step limit was too low.** Phase 5 made a tool round cost 3 steps (`llm`, `approve`, `tools`), so the default of 6 allowed only one round. "Show me chunk abc123, and if that does not work tell me what Kafka is" needs 7 steps (limit 8) and returned the step-limit apology with the search result already in hand | Default `recursionLimit` is now 15. The same question now answers in 7 steps |
+| **Ctrl+C was listened for on the process**, but the terminal interface is in raw mode, so the key never reaches the process | Listen on the terminal interface too (`terminal.on("SIGINT")`). A Ctrl+C at the approval prompt aborts the question and cancels the run |
+| **The answer line could be skipped** when the model wrote text next to a tool call | The answer is printed unless the last finished step streamed exactly that text |
+| **The abort listeners were removed only on success** | Removed in `finally` |
+| **The stream code had no test** | `tests/test-stream.ts` (7 tests): llm text goes to `onToken`, empty chunks and the tools node's output do not, a finished node is one step with its tokens, a pause is not a step |
+
+Cancel was checked by calling `abort()` in a script: mid-run it returns "Cancelled.", and resuming with an already-aborted signal also returns "Cancelled.". **Not checked:** pressing Ctrl+C in a real terminal (no terminal was available to drive).
 
 ---
 
@@ -859,7 +906,7 @@ Items are checked off as phases complete.
 - [x] A failed tool call is handled and the model recovers; stopping conditions are tested. *(Phase 3: `tests/test-tool-node.ts`, plus real runs recorded in section 10)*
 - [x] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4: `tests/test-memory.ts` and the demo in `agent-index.ts`)*
 - [x] A risky tool pauses for approval and resumes on the same thread. *(Phase 5: `tests/test-approve.ts` and real runs)*
-- [ ] Tokens and tool progress stream separately; Ctrl+C cancels a run, including a running tool. *(Phase 6)*
+- [x] Tokens and tool progress stream separately; a run can be cancelled. *(Phase 6: `tests/test-stream.ts`; cancel verified from code (fact 28), the Ctrl+C key itself not tried in a real terminal)*
 - [ ] Independent queries run in parallel and their results are combined; a run can be replayed and forked. *(Phase 7)*
 - [ ] Normal, incorrect and failed-tool scenarios are tested; `docs/LANGGRAPH-NOTES.md` explains what each LangGraph feature did and what was still hand-written. *(Phase 8)*
 - [ ] Existing suites still pass (hand-built agent, tools, SSE, loop) and `src/app/` is unchanged.
