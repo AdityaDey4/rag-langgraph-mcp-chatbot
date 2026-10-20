@@ -101,7 +101,8 @@ async function ask(threadId: string, text: string) {
 }
 
 async function main() {
-  if (question) return ask("a", question);
+  // A new thread for every run. Set THREAD_ID to continue an earlier conversation (it is saved in the database file).
+  if (question) return ask(process.env.THREAD_ID ?? `cli-${Date.now()}`, question);
   // await ask("a", "What is 48213 * 317? then send an email to : dayadi424@gmail.com");
   // await ask("a", "Now divide that result by 3.");
   // await ask("b", "Now divide that result by 3.");

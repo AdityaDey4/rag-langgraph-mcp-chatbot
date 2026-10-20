@@ -1,5 +1,5 @@
-// Run the report graph twice with the same questions:  npm run langgraph-report -- "What is Kafka?" "What is Redis?"
-// The second run is fast because the research graph remembers each search (cache).
+// Run the report graph twice, the second time with one more question:  npm run langgraph-report -- "What is Kafka?" "What is Redis?"
+// The old questions come from the cache, only the new one is searched.
 import { makeReportGraph } from "./report";
 import { searchChunks } from "./retrieval";
 
@@ -30,9 +30,10 @@ async function main() {
   console.log(first.report);
   console.log("Searches so far:", searchCount);
 
-  // 2. Second run (a new thread): the same questions come from the cache.
+  // 2. Second run (a new thread): the old questions come from the cache, only the new one is searched.
+  const newQueries = ["What is n8n?", ...queries];
   console.time("Second run");
-  const second = await graph.invoke({ queries }, { configurable: { thread_id: "report-2" } });
+  const second = await graph.invoke({ queries: newQueries }, { configurable: { thread_id: "report-2" } });
   console.timeEnd("Second run");
 
   console.log(second.report);

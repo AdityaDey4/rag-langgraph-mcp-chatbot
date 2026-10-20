@@ -112,7 +112,8 @@ async function main() {
   });
 
   await test("edited: the tool runs with the new arguments, and the original message is replaced, not duplicated", async () => {
-    const graph = buildGraph([email]);
+    // A different call id, because the email tool never sends the same call id twice.
+    const graph = buildGraph([{ ...email, id: "call_mail_edited" }]);
     const config = await start(graph);
     const decision = { approve: true, args: { to: "bob@example.com" } };
     await graph.invoke(new Command({ resume: decision }), config);

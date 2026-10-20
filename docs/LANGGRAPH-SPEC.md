@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.11, 2026-10-20. **Phases 1 to 7 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability; advanced graph patterns); Phase 8 (production-ready agents) is next |
+| **Status** | Draft v0.12, 2026-10-20. **All 8 phases are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability; advanced graph patterns; production-ready agents) |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
@@ -104,6 +104,9 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 | 21 | With `streamMode: ["updates", "values"]` the order is: one `values` (the state made from the input), then for each node an `updates` (only what it returned) followed by a `values` (the whole state after the merge) | 6 (verified early, not used in Phase 2) |
 | 22 | A `ToolMessage` carries the `tool_call_id` of the AI message's tool call that it answers, which is how results are matched to requests | 2 ✅ |
 | 23 | `tool.invoke({ ...toolCall, type: "tool_call" })` checks the arguments against the schema, runs the tool, and returns a `ToolMessage` with the same `tool_call_id` and name. A failing tool or invalid arguments make it **throw**. (Without `type: "tool_call"` the object is treated as the tool's arguments.) | 3 ✅ |
+| 36 | **`SqliteSaver`** (`@langchain/langgraph-checkpoint-sqlite`, with `better-sqlite3`; the prebuilt binary installed on Windows with Node 22) keeps the checkpoints in a file. A second graph built later on the same file continues the thread (count 1 then 2), and a run that was **paused for approval survived a server restart**: after `next dev` was killed and started again, the approval finished the run. On Windows the file stays locked until the process ends | 8 ✅ |
+| 35 | `getState` for a thread that never ran gives `next: []` and empty values (no error), so "is a run waiting for approval?" is `next.length > 0` | 8 ✅ |
+| 34 | A tool receives its own call id in its second argument: `async (args, config) => config?.toolCall?.id`. That is what makes "do not send the same email twice" possible | 8 ✅ |
 | 33 | **A compiled graph can be a node of another graph** (`addNode("research", research)`). State fields with the same name in both graphs are passed in and out automatically; the child's own fields stay inside it. A node cannot have the same name as a state field. The child has its own checkpointer here, so the parent run needs a `thread_id` too | 7 ✅ |
 | 32 | **Node cache:** `cachePolicy: { ttl: 60 }` on a node plus `cache: new InMemoryCache()` in `compile()`. The key is the node's input, so the same input is not run again, even on another thread (the second report run took 11 ms with no new searches). `InMemoryCache` comes from `@langchain/langgraph-checkpoint`, now a direct dependency (it was already installed as a dependency of LangGraph) | 7 ✅ |
 | 31 | `updateState(checkpointConfig, values, "search")`: the third argument says which node wrote the edit, so the node after it runs next. Without it the edit counts as coming from `START` and the whole fan-out runs again | 7 ✅ |
@@ -333,7 +336,7 @@ docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent with a question; streams the answer and shows progress), `langgraph-research` (parallel searches and the saved checkpoints), `langgraph-report` (the subgraph, and the cache on a second run), `test:langgraph-research` (parallel search, retries, time travel, cache, subgraph), `test:langgraph-stream` (reading the stream), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
+npm scripts: `langgraph` (run the agent with a question; streams the answer and shows progress), `langgraph-research` (parallel searches and the saved checkpoints), `langgraph-report` (the subgraph, and the cache on a second run), `test:langgraph-research` (parallel search, retries, time travel, cache, subgraph), `test:langgraph-api` (the API logic, the idempotent email, saved checkpoints), `test:langgraph-eval` (the real agent through the API, needs OpenAI and Qdrant), `test:langgraph-stream` (reading the stream), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -374,7 +377,7 @@ The scripted model records every request, so tests can assert what the model was
 | 5 | Human-in-the-loop | ✅ **Done** |
 | 6 | Streaming and observability | ✅ **Done** |
 | 7 | Advanced graph patterns | ✅ **Done** |
-| 8 | Production-ready agents | ⏭️ **Next** |
+| 8 | Production-ready agents | ✅ **Done** |
 
 Each phase has a practical task and an outcome. The design details behind each phase are in the sections noted under it.
 
@@ -862,7 +865,7 @@ Once the fundamentals are solid, learn more complex workflows.
 
 ---
 
-### Phase 8: Production-ready agents
+### Phase 8: Production-ready agents ✅
 
 Apply everything to a realistic backend.
 
@@ -878,6 +881,77 @@ Apply everything to a realistic backend.
 **Outcome:** build an agent that is testable, observable, and safer to operate.
 
 *Design:* sections 9 and 11. Like Phase 6, an API is outside this folder's current scope (section 13); the practical task widens the scope on purpose when this phase is reached.
+
+**What was built**
+
+| File | What it is |
+|---|---|
+| `api.ts` | `handleRequest(body)`: the API logic without Next.js. Validates the input (zod), runs or resumes the agent with a 60 s time limit, checks the answer, maps every failure to a status code, writes one log line per request |
+| `../app/api/langgraph/route.ts` | The one route: `POST /api/langgraph`. Refuses a body over 16 KB, reads the JSON, calls `handleRequest` |
+| `agent.ts` | `SqliteSaver` instead of `MemorySaver` (file `langgraph-checkpoints.db`, or `LANGGRAPH_DB`); `maxRetries: 2` on the model |
+| `tools/send-email.ts` | The same tool call id never sends twice |
+| `../app/langgraph/page.tsx` and `chat.tsx` | A chat page at `/langgraph` that uses the API: messages, a thread kept for the conversation, an approval card (Approve, Edit the arguments as JSON, Reject), error messages and a "New chat" button. The existing page `/` and its components were not changed |
+| `agent-index.ts` | A new thread id for each run (`THREAD_ID=… ` continues a saved one), because threads are now saved in a file |
+| `tests/test-api.ts` | 18 tests, no network |
+| `tests/test-eval.ts` | 5 scenarios with the real model and Qdrant (skipped when they are not available) |
+
+**The API**
+
+| Request | Answer |
+|---|---|
+| `{ "question": "…", "threadId"?: "…" }` | `200 { status: "answered", answer, threadId, requestId }`, or `200 { status: "needs_approval", approval: { calls }, … }` |
+| `{ "threadId": "…", "decision": { "approve": true, "args"?: {…} } }` | Resumes the paused run: `200`, or `409` when no run is waiting on that thread |
+| Bad input | `400` with what is wrong (empty or over 2000 characters, a `threadId` with characters other than letters, digits, `_`, `-`, a question and a decision together, a decision without a `threadId`, invalid JSON); the agent is not called |
+| The agent takes over 60 s | `504`; the run is cancelled |
+| The answer is empty | `502` |
+| Anything else breaks | `500 { error: "Something went wrong." }`; the details are only in the server log |
+
+**How each topic was covered**
+
+| Topic | What was done |
+|---|---|
+| Input and output validation | zod on the request (above); the answer is checked to be non-empty before it is returned |
+| Tool permissions | The tools list is the allowlist (an unknown tool name becomes an error message, Phase 3). `send_email` needs a decision before it runs (Phase 5); over the API the decision comes as a second request, and only for a thread that is waiting |
+| Prompt-injection defenses | Already in place: tool results are wrapped as untrusted data with tags that cannot be closed early, and the system prompt says to ignore instructions inside them (tested in `test-tools.ts`). A model's obedience cannot be tested offline, so this is a defense, not a proof |
+| Timeouts | 60 s for the whole request (`AbortSignal.timeout`, passed to the run); the model call is retried twice (`maxRetries: 2`); a failed search is retried in the research graph (Phase 7) |
+| Idempotency | The same `send_email` call id is never sent twice (test), and a decision cannot be sent twice (the second gets `409`) |
+| Persistent checkpoints and recovery | `SqliteSaver` (fact 36). Tested with a new graph on the same file, and for real: a run paused for approval, the server killed and started again, the approval sent: the email went out once |
+| Evaluation and regression tests | `test-eval.ts`: normal question with a citation, a greeting without tools, a failed tool (unknown chunk id) that is recovered from, a risky tool that waits and can be rejected (and a second decision gets `409`), a follow-up on the same thread. All 5 passed. Run it again after changing the prompt, tools or graph |
+| Deployment and monitoring | One JSON log line per request with `requestId`, `threadId`, status, time, steps and tokens (no question or answer text). To run it: `npm run dev` or `npm run build` and `npm start`, with `OPENAI_API_KEY`, `QDRANT_URL` and (optional) `LANGGRAPH_DB` set. **One server process per database file** (SQLite); more than one needs a database server such as Postgres. The 60 s limit is also what a hosting platform's own limit must allow |
+
+**Checked** (in this order)
+
+| Check | Result |
+|---|---|
+| `test-api.ts` (normal, 8 kinds of bad input, approval, 409, crash, timeout, empty answer, idempotent email, saved checkpoints) | 18 passed |
+| `test-eval.ts` with the real model and Qdrant | 5 passed (8.3 s, 1.3 s, 9.1 s, 2.7 s, 5.2 s) |
+| The real route over HTTP (`next dev`): bad JSON `400`, no fields `400`, a question `200`, an email question `200 needs_approval`, the approval with an edited address `200` (the email went to the edited address), the same approval again `409` | passed |
+| The page `/langgraph` in the browser: an email question shows the approval card; "Edit" with a new recipient and "Approve with changes" sent the email to the new address (the server log shows it); a document question afterwards answered with a citation in the same thread | passed |
+| Restart: paused run, server killed, server started, approval sent | the run finished and the email was sent once |
+| Existing suites: hand-built agent tools and loop | 23 and 27 passed (the SSE test was not run) |
+
+**Findings**
+
+- **A paused run is data in a file now.** The terminal used to forget everything on exit; with a database file a pause survives the process, which is what makes an approval API possible. It also means the CLI must not reuse a thread by accident (each run gets a new one).
+- **After an edited approval the model's reply named the original address.** The email went to the edited address (the log shows it), but the model's final sentence said the first one. The tool result says the right address, so the model did not follow it. Checking what was really done is the tool's job, not the model's words.
+- **The failed-tool scenario can take many steps.** The unknown-chunk-id question took three tool rounds (10 steps in all) before the model answered. It still answered; the step limit of 15 is what allowed it (the limit of 6 would not have).
+- **`send_email` is simulated.** A real one would also need a stored record of what was sent (the idempotency set here is in memory and lost on restart), which is a place for the database.
+
+**What LangGraph gave, and what stayed hand-written** (the comparison with the hand-built agent, kept qualitative on purpose)
+
+| Need | LangGraph gave | Written by hand |
+|---|---|---|
+| The loop (model, tools, model) | `StateGraph`, nodes, conditional edges | The tools node (`runTools`), to control error text |
+| Conversation memory | A checkpointer and `thread_id`; SQLite is a one-line change | Trimming what the model sees (`messagesForModel`) |
+| Pausing for a human | `interrupt()` and `Command({ resume })` | The approval rules and the API around them |
+| Progress and tokens | `stream` with `updates` and `messages` | Printing, timing and filtering the chunks |
+| Cancelling | The `signal` option | Turning it into "Cancelled" or `504` |
+| Parallel work, retries, caching, time travel | `Send`, `retryPolicy`, `cachePolicy`, `getStateHistory` | Which things to run in parallel |
+| Step limit | `recursionLimit` | Raising it when a node was added (Phase 6) |
+| Guardrails (error budget, injection wrapper, input checks, idempotency) | Nothing | All of it (the "expected finding" of section 4 held) |
+| What has the hand-built agent that LangGraph does not | | Budgets for tokens, time and tool calls, the repeated-call guard, and a trace in the browser UI |
+
+**When a framework is worth it:** when the agent needs memory, pauses, parallel branches or replay, because those are the parts that are easy to get wrong by hand and cost little here. When the agent is one loop with a few tools, the hand-built version was shorter and had more guards. The guards were the work in both.
 
 ---
 
@@ -914,7 +988,7 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 
 1. ~~Keep `ToolNode` after Phase 3, or always use a custom `tools` node.~~ **Decided in Phase 3: the custom `runTools` node replaced `ToolNode`.** It is about 25 lines and gives control over error text and state updates.
 2. ~~How far to go in Phase 7.~~ **Decided in Phase 7: all of it** (parallel branches, a joining reducer, `Command`, retries, caching, a subgraph and time travel). Everything is in separate small graphs; the agent graph was not changed.
-3. Whether to run the Phase 8 comparison at all, or keep the notes qualitative.
+3. ~~Whether to run the Phase 8 comparison.~~ **Decided in Phase 8: qualitative.** The comparison is a table in the Phase 8 section (what LangGraph gave, what stayed hand-written). No harness was built.
 4. ~~`MessagesAnnotation` or `StateSchema` + `MessagesValue`?~~ **Decided in Phase 2: `Annotation.Root` with `MessagesAnnotation.spec`**, as in the curriculum. It works in the installed version. The current docs prefer `StateSchema`; revisit if that changes.
 
 ---
@@ -925,11 +999,11 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 
 **Out of scope** (until a phase says otherwise, see the risks table):
 
-- SSE, `POST /api/agent` changes, the browser UI, the shared `AgentEvent` stream, Next.js integration.
+- SSE, `POST /api/agent` changes, changes to the existing browser UI, the shared `AgentEvent` stream. (Phase 8 added **one** route, `src/app/api/langgraph/route.ts`, because its practical task asks for an API, and afterwards a separate page `src/app/langgraph/` on request; neither changes anything that existed.)
 - Replacing or deleting the hand-built agent.
 - MCP (still future, with its own spec).
 - LangSmith or any hosted tracing; LangGraph Platform / Studio.
-- Durable checkpoint stores (Postgres, SQLite) until Phase 8.
+- A database server for the checkpoints (Postgres). Phase 8 uses a SQLite file.
 - Changing retrieval (still dense-only top-k), the prompt, or the tools.
 
 ---
@@ -947,7 +1021,7 @@ Items are checked off as phases complete.
 - [x] A risky tool pauses for approval and resumes on the same thread. *(Phase 5: `tests/test-approve.ts` and real runs)*
 - [x] Tokens and tool progress stream separately; a run can be cancelled. *(Phase 6: `tests/test-stream.ts`; cancel verified from code (fact 28), the Ctrl+C key itself not tried in a real terminal)*
 - [x] Independent queries run in parallel and their results are combined; a run can be replayed and forked. *(Phase 7: `tests/test-research.ts`; real run against Qdrant not done yet, see the Phase 7 section)*
-- [ ] Normal, incorrect and failed-tool scenarios are tested; `docs/LANGGRAPH-NOTES.md` explains what each LangGraph feature did and what was still hand-written. *(Phase 8)*
-- [ ] Existing suites still pass (hand-built agent, tools, SSE, loop) and `src/app/` is unchanged.
-- [ ] Code follows the principles in section 3 throughout: each new file short enough to read in one sitting, LangGraph built-ins unless replacing one is the lesson, comments that explain the LangGraph idea.
-- [ ] No outbound calls other than OpenAI and Qdrant (no LangSmith).
+- [x] Normal, incorrect and failed-tool scenarios are tested; the notes on what each LangGraph feature did and what was still hand-written are in the Phase 8 section (a separate notes file was not made). *(Phase 8: `tests/test-api.ts`, `tests/test-eval.ts`)*
+- [x] Existing suites still pass (hand-built agent tools 23, loop 27; the SSE test was not run) and `src/app/` has only the one new route. *(Phase 8)*
+- [x] Code follows the principles in section 3 throughout: plain statements, one idea per line, short comments. *(the style the owner asked for in Phase 7 was followed from then on)*
+- [x] No outbound calls other than OpenAI and Qdrant (no LangSmith).

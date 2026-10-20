@@ -1,13 +1,13 @@
 
 import {
   StateGraph,
-  MemorySaver,
   Command,
   GraphRecursionError,
   START,
   END,
 } from "@langchain/langgraph";
 
+import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import { ChatOpenAI } from "@langchain/openai";
 import {
   AIMessage,
@@ -35,6 +35,7 @@ import { tools } from "./tools";
 const model = new ChatOpenAI({
   model: CHAT_MODEL,
   temperature: 0,
+  maxRetries: 2, // a failed model call is tried again twice before the run fails
 });
 
 // 2. Make all six tools available to the LLM (means llm can request these tools; it never runs them)
@@ -107,7 +108,8 @@ function shouldContinue(state: typeof AgentState.State) {
 }
 
 // 6. Build and compile the graph
-// The checkpointer saves the state after every step under a thread_id. It lives in memory, so it is lost when the process stops.
+// The checkpointer saves the state after every step under a thread_id.
+// It is a SQLite file, so the conversations survive a restart. LANGGRAPH_DB changes the file.
 export const graph = new StateGraph(AgentState)
   .addNode("llm", callModel)
   .addNode("approve", approve)
@@ -127,7 +129,9 @@ export const graph = new StateGraph(AgentState)
     giveUp: "giveUp",
   })
   .addEdge("giveUp", END)
-  .compile({ checkpointer: new MemorySaver() });
+  .compile({
+    checkpointer: SqliteSaver.fromConnString(process.env.LANGGRAPH_DB ?? "langgraph-checkpoints.db"),
+  });
 
 // 7. Export reusable functions for your application
 // What the human is asked to decide: the risky tool calls the model wants to make.
