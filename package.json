@@ -23,11 +23,15 @@
     "test:langgraph-tool-node": "tsx src/langgraph/tests/test-tool-node.ts",
     "test:langgraph-memory": "tsx src/langgraph/tests/test-memory.ts",
     "test:langgraph-approve": "tsx src/langgraph/tests/test-approve.ts",
-    "test:langgraph-stream": "tsx src/langgraph/tests/test-stream.ts"
+    "test:langgraph-stream": "tsx src/langgraph/tests/test-stream.ts",
+    "test:langgraph-research": "tsx src/langgraph/tests/test-research.ts",
+    "langgraph-research": "tsx src/langgraph/research-index.ts",
+    "langgraph-report": "tsx src/langgraph/report-index.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.18",
     "@langchain/langgraph": "^1.5.0",
+    "@langchain/langgraph-checkpoint": "^1.2.0",
     "@langchain/openai": "^1.6.2",
     "@qdrant/js-client-rest": "^1.19.0",
     "crypto": "^1.0.1",

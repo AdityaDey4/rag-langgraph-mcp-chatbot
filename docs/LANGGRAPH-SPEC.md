@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.9, 2026-10-19. **Phases 1 to 6 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability); Phase 7 (advanced graph patterns) is next |
+| **Status** | Draft v0.11, 2026-10-20. **Phases 1 to 7 are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability; advanced graph patterns); Phase 8 (production-ready agents) is next |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
@@ -104,6 +104,11 @@ The LangGraph.js API has changed a lot (older tutorials use `Annotation`, `Messa
 | 21 | With `streamMode: ["updates", "values"]` the order is: one `values` (the state made from the input), then for each node an `updates` (only what it returned) followed by a `values` (the whole state after the merge) | 6 (verified early, not used in Phase 2) |
 | 22 | A `ToolMessage` carries the `tool_call_id` of the AI message's tool call that it answers, which is how results are matched to requests | 2 ✅ |
 | 23 | `tool.invoke({ ...toolCall, type: "tool_call" })` checks the arguments against the schema, runs the tool, and returns a `ToolMessage` with the same `tool_call_id` and name. A failing tool or invalid arguments make it **throw**. (Without `type: "tool_call"` the object is treated as the tool's arguments.) | 3 ✅ |
+| 33 | **A compiled graph can be a node of another graph** (`addNode("research", research)`). State fields with the same name in both graphs are passed in and out automatically; the child's own fields stay inside it. A node cannot have the same name as a state field. The child has its own checkpointer here, so the parent run needs a `thread_id` too | 7 ✅ |
+| 32 | **Node cache:** `cachePolicy: { ttl: 60 }` on a node plus `cache: new InMemoryCache()` in `compile()`. The key is the node's input, so the same input is not run again, even on another thread (the second report run took 11 ms with no new searches). `InMemoryCache` comes from `@langchain/langgraph-checkpoint`, now a direct dependency (it was already installed as a dependency of LangGraph) | 7 ✅ |
+| 31 | `updateState(checkpointConfig, values, "search")`: the third argument says which node wrote the edit, so the node after it runs next. Without it the edit counts as coming from `START` and the whole fan-out runs again | 7 ✅ |
+| 30 | `retryPolicy: { maxAttempts: 3, initialInterval: 200 }` on a node retries only that node (after 200 ms, then 400 ms); the other parallel branches are not run again. When all attempts fail, the original error is thrown out of `invoke` | 7 ✅ |
+| 29 | A node can route and update the state with one `Command`: `new Command({ goto: [new Send("search", { query }), …] })` fans out like a conditional edge does; the node needs `{ ends: ["search"] }` in `addNode` so LangGraph knows where it can go | 7 ✅ |
 | 28 | `graph.stream(input, { signal })` with the signal aborted mid-run throws an error named `AbortError`; `runAgent` catches it and returns "Cancelled." (1.5 s after the abort was scheduled, before the model had answered) | 6 ✅ |
 | 27 | The `llm` node's update message carries `usage_metadata` (input and output tokens) even though its tokens were streamed; a pause appears as an update chunk keyed `__interrupt__` | 6 ✅ |
 | 26 | In `messages` mode the **tools node also appears** (its `ToolMessage` text), so token streaming must filter on `langgraph_node === "llm"`. Tool-call fragments arrive with empty text and are skipped by the same check | 6 ✅ |
@@ -328,7 +333,7 @@ docs/
   LANGGRAPH-NOTES.md     Findings, written in Phase 8
 ```
 
-npm scripts: `langgraph` (run the agent with a question; streams the answer and shows progress), `test:langgraph-stream` (reading the stream), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
+npm scripts: `langgraph` (run the agent with a question; streams the answer and shows progress), `langgraph-research` (parallel searches and the saved checkpoints), `langgraph-report` (the subgraph, and the cache on a second run), `test:langgraph-research` (parallel search, retries, time travel, cache, subgraph), `test:langgraph-stream` (reading the stream), `test:langgraph-approve` (pausing, approving, rejecting, editing), `test:langgraph-memory` (threads and trimming), `test:langgraph-tools` (tools and the "stands alone" check), `test:langgraph-state` (the state and its reducers), `test:langgraph-tool-node` (running tools and failures).
 
 Dependencies added: `@langchain/langgraph`, `@langchain/core`, `@langchain/openai`.
 
@@ -368,8 +373,8 @@ The scripted model records every request, so tests can assert what the model was
 | 4 | Persistence and memory | ✅ **Done** |
 | 5 | Human-in-the-loop | ✅ **Done** |
 | 6 | Streaming and observability | ✅ **Done** |
-| 7 | Advanced graph patterns | ⏭️ **Next** |
-| 8 | Production-ready agents | ⬜ |
+| 7 | Advanced graph patterns | ✅ **Done** |
+| 8 | Production-ready agents | ⏭️ **Next** |
 
 Each phase has a practical task and an outcome. The design details behind each phase are in the sections noted under it.
 
@@ -804,7 +809,7 @@ Cancel was checked by calling `abort()` in a script: mid-run it returns "Cancell
 
 ---
 
-### Phase 7: Advanced graph patterns
+### Phase 7: Advanced graph patterns ✅
 
 Once the fundamentals are solid, learn more complex workflows.
 
@@ -820,6 +825,40 @@ Once the fundamentals are solid, learn more complex workflows.
 **Outcome:** design more complex workflows without turning everything into one giant node.
 
 *Design:* section 7 (inspect, replay, fork), facts 10, 11, 12 and 14.
+
+**What was built:** two small graphs for the practical task. The agent graph (`agent.ts`) was not changed.
+
+| File | What it is |
+|---|---|
+| `research.ts` | `START → plan → search (one per question, in parallel) → combine → END`. `makeResearchGraph(search)` takes the search function, so tests can use a fake one |
+| `research-index.ts` | `npm run langgraph-research -- "What is Kafka?" "What is Redis?"`: runs it, prints the combined summary, the time taken, and every saved checkpoint. Replay and fork are covered by the tests, not by this script |
+| `report.ts` | `START → research → write → END`. The whole research graph is one node (a subgraph); `write` puts a title on its summary |
+| `report-index.ts` | `npm run langgraph-report`: runs the report graph twice with the same questions, to show the cache |
+| `tests/test-research.ts` | 9 tests, no network |
+
+**Concepts**
+
+- **Fan-out (map).** `plan` returns `new Command({ goto: [Send("search", { query: A }), Send("search", { query: B }), …] })`. LangGraph runs those `search` nodes in the same step, each with its own input (fact 29). `Command` is the one return value that updates the state *and* routes.
+- **The reducer is the join (reduce).** Each `search` returns `found: [one result]`, and the `found` reducer appends them. `addEdge("search", "combine")` waits for every branch, so `combine` sees all results. Parallel branches finish in any order, so `combine` puts them back in the order of the questions.
+- **Custom state.** `ResearchState` has its own fields and reducers (`queries` replaced, `found` joined, `summary` replaced). It is separate from `AgentState` because the two graphs share nothing.
+- **Retries.** `retryPolicy` on the `search` node: a failed search is tried again before the run fails (fact 30). A real run without Qdrant showed it: each search was retried twice (after about 0.5 s and 1 s), then the run failed with "fetch failed".
+- **Caching.** `cachePolicy: { ttl: 60 }` on `search` and `cache: new InMemoryCache()` in `compile()` (fact 32). The first report run searched 3 questions in 2.97 s; the second run, on a new thread, took 11 ms and searched nothing.
+- **Subgraph.** `report.ts` uses the compiled research graph as a node (fact 33). Both graphs have `queries` and `summary`, so those pass through; `found` stays inside the research graph (tested).
+- **Time travel.** `getStateHistory` lists one saved step per node (newest first: finished, `combine` next, three searches next, `plan` next, start). **Replay:** `invoke(null, checkpoint.config)` runs only what comes after that step, so no search runs again. **Fork:** `updateState(checkpoint.config, values, "search")` applies the values through the reducers (2 results plus 1 gives 3) and the run continues from there (fact 31).
+
+**Checked**
+
+| Check | Result |
+|---|---|
+| 9 offline tests: one search per question and results in question order; searches run at the same time (3 searches of 100 ms in under 250 ms); a flaky search that fails twice still succeeds (3 calls); a search that always fails stops after 3 attempts; replay gives the same summary with no new searches; fork gives 3 results with no new searches; the same question on another thread is not searched again; the report graph runs the research graph and writes the report; `found` does not leak into the report graph | passed |
+| `npm run langgraph-research` against Qdrant | passed: 3 searches in about 2.5 s; the nonsense question "What is ttrhtrtrj?" still got a best match (n8n, score 0.18), because `combine` does not look at the score |
+| `npm run langgraph-report` against Qdrant | passed: first run 2.97 s with 3 searches, second run 11 ms with no new searches |
+
+**Finding:** a low score is not "nothing found". The research graph reports the best match even when its score is 0.18. A real version would drop results under a threshold; it was left out because the task is about the graph shape, not about retrieval quality.
+
+---|---|
+| 6 offline tests: one search per question and results in question order; searches run at the same time (3 searches of 100 ms in under 250 ms); a flaky search that fails twice still succeeds (3 calls); a search that always fails stops after 3 attempts; replay gives the same summary with no new searches; fork gives 3 results with no new searches | passed |
+| `npm run langgraph-research` against Qdrant | **not run**: Docker was not running, so Qdrant was unavailable. The failed run above only proved the retries |
 
 ---
 
@@ -874,7 +913,7 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 ### Open decisions (record in the notes)
 
 1. ~~Keep `ToolNode` after Phase 3, or always use a custom `tools` node.~~ **Decided in Phase 3: the custom `runTools` node replaced `ToolNode`.** It is about 25 lines and gives control over error text and state updates.
-2. How far to go in Phase 7 (fan-out, subgraphs, node caching): all of it, or only parallel branches.
+2. ~~How far to go in Phase 7.~~ **Decided in Phase 7: all of it** (parallel branches, a joining reducer, `Command`, retries, caching, a subgraph and time travel). Everything is in separate small graphs; the agent graph was not changed.
 3. Whether to run the Phase 8 comparison at all, or keep the notes qualitative.
 4. ~~`MessagesAnnotation` or `StateSchema` + `MessagesValue`?~~ **Decided in Phase 2: `Annotation.Root` with `MessagesAnnotation.spec`**, as in the curriculum. It works in the installed version. The current docs prefer `StateSchema`; revisit if that changes.
 
@@ -907,7 +946,7 @@ Items are checked off as phases complete.
 - [x] A follow-up in the same thread remembers earlier turns; a different thread does not. *(Phase 4: `tests/test-memory.ts` and the demo in `agent-index.ts`)*
 - [x] A risky tool pauses for approval and resumes on the same thread. *(Phase 5: `tests/test-approve.ts` and real runs)*
 - [x] Tokens and tool progress stream separately; a run can be cancelled. *(Phase 6: `tests/test-stream.ts`; cancel verified from code (fact 28), the Ctrl+C key itself not tried in a real terminal)*
-- [ ] Independent queries run in parallel and their results are combined; a run can be replayed and forked. *(Phase 7)*
+- [x] Independent queries run in parallel and their results are combined; a run can be replayed and forked. *(Phase 7: `tests/test-research.ts`; real run against Qdrant not done yet, see the Phase 7 section)*
 - [ ] Normal, incorrect and failed-tool scenarios are tested; `docs/LANGGRAPH-NOTES.md` explains what each LangGraph feature did and what was still hand-written. *(Phase 8)*
 - [ ] Existing suites still pass (hand-built agent, tools, SSE, loop) and `src/app/` is unchanged.
 - [ ] Code follows the principles in section 3 throughout: each new file short enough to read in one sitting, LangGraph built-ins unless replacing one is the lesson, comments that explain the LangGraph idea.
