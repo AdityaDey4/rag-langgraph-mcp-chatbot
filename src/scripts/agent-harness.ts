@@ -12,6 +12,7 @@ import type { AgentEvent, Budgets } from "../lib/agent/types";
 import { getOpenAI } from "../lib/clients";
 import { CHAT_MODEL } from "../lib/config";
 import { addMessage } from "../lib/conversation-memory";
+import { runForEvaluation } from "../langgraph/summary";
 
 const EMBEDDING_PRICE_PER_M = 0.13; // text-embedding-3-large, approximate
 
@@ -67,7 +68,7 @@ function resetMeter() {
 export type ToolCallRecord = { name: string; args: unknown; isError: boolean };
 
 export type RunSummary = {
-  path: "agent" | "classic";
+  path: "agent" | "classic" | "langgraph";
   question: string;
   answer: string;
   toolCalls: ToolCallRecord[];
@@ -211,6 +212,31 @@ export async function runClassicOnce(
 // LLM-as-judge (small, fixed rubric). A judge is itself a model: treat the
 // verdicts as a signal, and read the reasons.
 // ---------------------------------------------------------------------------
+
+// The LangGraph agent (src/langgraph), run the same way and summarised in the same shape.
+export async function runLangGraphOnce(
+  question: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = []
+): Promise<RunSummary> {
+  const run = await runForEvaluation(question, history);
+
+  return {
+    path: "langgraph",
+    question,
+    answer: run.answer,
+    toolCalls: run.toolCalls,
+    steps: run.modelCalls, // the hand-built agent also counts model calls as steps
+    chatCalls: run.modelCalls,
+    inputTokens: run.inputTokens,
+    outputTokens: run.outputTokens,
+    embeddingTokens: 0, // not measured: LangChain's embeddings client is not the one the meter watches
+    costUsd: run.costUsd,
+    latencyMs: run.latencyMs,
+    stoppedBy: run.stoppedBy,
+    citations: run.citations,
+    error: run.error,
+  };
+}
 
 export type Verdict = { pass: boolean; reason: string };
 

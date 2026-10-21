@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.12, 2026-10-20. **All 8 phases are done** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability; advanced graph patterns; production-ready agents) |
+| **Status** | Draft v0.13, 2026-10-21. **All 8 phases are done, and the optional evaluation (section 11) has been run** (graph fundamentals; state and reducers; tool calling and agent loops; persistence and memory; human-in-the-loop; streaming and observability; advanced graph patterns; production-ready agents) |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how LangGraph works** by using each of its core ideas in a real agent, with every step visible in a terminal. |
 | **Interface** | A command line and tests. **No SSE, no HTTP route, no browser UI.** |
@@ -955,7 +955,7 @@ Apply everything to a realistic backend.
 
 ---
 
-## 11. Evaluation (Phase 8, optional)
+## 11. Evaluation (Phase 8, optional) ✅
 
 If a comparison with the hand-built agent is wanted, no event stream is needed: a small `summary.ts` (in `src/langgraph/`) can turn the final graph state into the same `RunSummary` the behaviour harness already uses (answer, tool calls, steps, tokens), and `agent:behaviour` can get `--engine langgraph`.
 
@@ -967,6 +967,71 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 | What LangGraph added | Checkpoint history, replay, interrupts, diagram: noted, not scored |
 
 **Honesty rules (learned in the earlier agent experiments):** the prompt was tuned against these 17 questions, so also write 10 to 15 fresh ones **before** looking at LangGraph results and score both once with no tuning. Do not retune the prompt per engine.
+
+### What was built
+
+| File | What it is |
+|---|---|
+| `src/langgraph/summary.ts` | `runForEvaluation(question, history)`: runs one question through the LangGraph agent on a new thread and returns the answer, the tool calls (with failures), the model calls, tokens, cost, time and how it stopped. Earlier turns of a follow-up question are put into the thread first (`updateState`, checked offline) |
+| `src/scripts/agent-harness.ts` | `runLangGraphOnce` turns that into the harness's `RunSummary` |
+| `src/scripts/agent-behaviour.ts` | New flags `--langgraph` (also run every question through the LangGraph agent, judged by the same judge and the same tool checks) and `--file <name>` (a questions file in `eval/`) |
+| `eval/agent-fresh.jsonl` | 16 new questions, **written before any LangGraph result on them was seen** (honesty rule above): greeting, 5 single-fact, 2 comparisons, 2 arithmetic, date, list, unanswerable, prompt-injection attempt, follow-up, format, failed tool |
+
+Commands (2 repeats each, both agents run on every question in the same session; the prompt was not changed between or during runs):
+
+```
+npm run agent:behaviour -- --langgraph --repeat 2
+npm run agent:behaviour -- --langgraph --repeat 2 --file agent-fresh.jsonl
+```
+
+Results are saved in `eval/results/behaviour-2026-10-21T11-07-01-138Z.json` (the 17 tuned questions) and `…T11-12-05-232Z.json` (the 16 fresh ones). Model for both: `gpt-4o-mini`; the judge is the harness's own.
+
+### Results
+
+| | Hand-built agent | LangGraph agent |
+|---|---|---|
+| **17 tuned questions** (34 runs): task success | 32/34 (94%) | 32/34 (94%) |
+| **16 fresh questions** (32 runs): task success | 27/32 (84%) | 28/32 (88%) |
+| Tool behaviour correct (fresh) | 30/32 | 30/32 |
+| Mean model calls per run (tuned / fresh) | 2.09 / 2.28 | 2.06 / 2.34 |
+| Mean tool calls (tuned / fresh) | 1.26 / 1.31 | 1.24 / 1.34 |
+| Mean chat tokens (tuned / fresh) | 3777 / 4031 | 4040 / 4740 |
+| Mean cost per run (tuned / fresh) | $0.00061 / $0.00064 | $0.00065 / $0.00075 |
+| Mean latency (tuned / fresh) | 3.6 s / 3.3 s | 3.3 s / 3.5 s |
+
+**By category** (task success, tuned + fresh together): greeting, single, comparison, list, unanswerable, safety, follow-up: identical. Format (tuned question): 0/2 for both. Arithmetic (fresh): 2/4 for both. Tool failure (fresh): 0/2 for both. Date (fresh): hand-built 1/2, LangGraph 2/2.
+
+### What the numbers say
+
+- **The two agents behave the same.** Same success rate on the tuned questions, 88% against 84% on the fresh ones (one run out of 32), the same steps and tool calls, similar time. With 2 repeats and a model that is not deterministic, a difference of one run is noise. No claim is made that either is better.
+- **Every failure was shared, so the cause is the prompt and the questions, not the framework.**
+  - *Format (tuned):* "In one line, what is Redis?" fails in both agents on all 4 runs (the judge did not accept the answer as one line).
+  - *Partitions math (fresh):* both called `calculate` but not `search_documents`, so the tool check failed, although the answer (3) was right. This is a weakness of the question: "according to the document" did not force a search.
+  - *Failed tool (fresh):* both searched for the indexes and answered, but never said the chunk id was missing, so the judge failed them. The system prompt does not tell the model to report a failed lookup, in either agent.
+  - *Date (fresh):* the hand-built agent was marked wrong once for "No, today is Wednesday, October 21, 2026". That is correct (21 October 2026 is a Wednesday), so this is judge noise. It was not re-scored, as the rules say.
+- **LangGraph used about 7% more tokens on the tuned questions and 18% more on the fresh ones.** Most likely cause: its agent has a sixth tool (`send_email`) and one more line in the prompt, so every model call carries a bigger tool list. The difference is not the loop itself. This was not isolated by a run without `send_email`.
+- **Measurement difference:** LangGraph's embedding tokens are not counted (0 against about 5 for the hand-built agent), because LangChain's embeddings client is not the one the harness meters. A search query is about 10 tokens, so this does not change the cost in any visible way.
+- **The step limit is a different guard.** The hand-built agent stops by model calls (6), tool calls (8), tokens and time. The LangGraph agent stops by graph steps (15, where a tool round costs 3), by 3 tool failures, and by the 60 s limit in the API. None of the 66 LangGraph runs hit a limit.
+
+### Code size and guardrails
+
+Lines are counted without blank lines and comment lines (all lines in brackets).
+
+| Part | Hand-built | LangGraph |
+|---|---|---|
+| Agent core (loop, state, tools node, approval, prompt, tools, retrieval, config, logging) | 1,177 (1,426) in `lib/agent/` without `sse.ts` and `trace.ts`, plus 150 (185) for retrieval, clients and config | 722 (976) in `src/langgraph/` |
+| Web streaming of events (`sse.ts`, `trace.ts`) | 160 (214) | not needed here: the stream comes from `graph.stream`, and the page does not stream |
+| Extras that exist only in the LangGraph version | | `api.ts`, `summary.ts`, `research.ts`, `report.ts`: 298 (411) |
+
+The LangGraph core is about 45% shorter than the hand-built core with its retrieval and config (722 against 1,327). Part of that is code the LangGraph agent does not have: see the guardrails.
+
+Of the 13 guardrails in section 9, **7 are built** and **6 are not**: the forced answer at the step budget, the tool-call budget, the repeat guard, the timeout for a hung tool, the token budget and the citation check. Of the 7 built, LangGraph provides the step limit (`recursionLimit`) and cancelling (`signal`); the rest are hand-written (error results, the stop after 3 failures, the untrusted wrapper, the history window, the no-tools-for-greetings prompt). So the shorter code is partly fewer guards, and the guards were the hand-written part in both, as section 4 expected.
+
+**What LangGraph added** (noted, not scored): saved checkpoints with history and replay, pausing for approval, parallel branches, a subgraph and node caching, all without extra loop code.
+
+**Answer to "when is a framework worth it":** these results do not show a quality or cost reason either way. The reason is the features above, and the cost is a larger dependency and a separate way of thinking (state, reducers, checkpoints). For one loop with a few tools, the hand-built agent did the same job with more guards already in place.
+
+**Limits of this evaluation:** one judge model, 2 repeats, one document of 9 passages, 33 questions in total, and the fresh questions are few. One run of difference means nothing. Re-run after any change to the prompt, the tools or the graph.
 
 ---
 
@@ -988,7 +1053,7 @@ If a comparison with the hand-built agent is wanted, no event stream is needed: 
 
 1. ~~Keep `ToolNode` after Phase 3, or always use a custom `tools` node.~~ **Decided in Phase 3: the custom `runTools` node replaced `ToolNode`.** It is about 25 lines and gives control over error text and state updates.
 2. ~~How far to go in Phase 7.~~ **Decided in Phase 7: all of it** (parallel branches, a joining reducer, `Command`, retries, caching, a subgraph and time travel). Everything is in separate small graphs; the agent graph was not changed.
-3. ~~Whether to run the Phase 8 comparison.~~ **Decided in Phase 8: qualitative.** The comparison is a table in the Phase 8 section (what LangGraph gave, what stayed hand-written). No harness was built.
+3. ~~Whether to run the Phase 8 comparison.~~ **Decided: it was run (section 11)**, first as the qualitative table in the Phase 8 section and then with numbers.
 4. ~~`MessagesAnnotation` or `StateSchema` + `MessagesValue`?~~ **Decided in Phase 2: `Annotation.Root` with `MessagesAnnotation.spec`**, as in the curriculum. It works in the installed version. The current docs prefer `StateSchema`; revisit if that changes.
 
 ---

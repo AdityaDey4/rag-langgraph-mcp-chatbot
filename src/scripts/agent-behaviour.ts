@@ -7,6 +7,7 @@ import {
   percent,
   runAgentOnce,
   runClassicOnce,
+  runLangGraphOnce,
   saveResults,
   toolNames,
   usd,
@@ -21,6 +22,8 @@ expected TOOL BEHAVIOUR with code, and judges the ANSWER with an LLM rubric.
 
 Options:
   --classic       Also run every question through /api/ask for comparison (E5)
+  --langgraph     Also run every question through the LangGraph agent (src/langgraph)
+  --file <name>   Questions file in eval/ (default agent.jsonl)
   --repeat <n>    Run each question n times (default 1; models are not deterministic)
   --only <id,id>  Only run these question ids
   --help`;
@@ -55,10 +58,12 @@ type Outcome = {
 };
 
 function parseArgs(argv: string[]) {
-  const options = { classic: false, repeat: 1, only: null as string[] | null };
+  const options = { classic: false, langgraph: false, file: "agent.jsonl", repeat: 1, only: null as string[] | null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--classic") options.classic = true;
+    else if (arg === "--langgraph") options.langgraph = true;
+    else if (arg === "--file") options.file = argv[++i] ?? options.file;
     else if (arg === "--repeat") options.repeat = Math.max(1, Number(argv[++i]) || 1);
     else if (arg === "--only") options.only = (argv[++i] ?? "").split(",").filter(Boolean);
     else {
@@ -69,8 +74,8 @@ function parseArgs(argv: string[]) {
   return options;
 }
 
-function loadQuestions(): Question[] {
-  const file = path.join(process.cwd(), "eval", "agent.jsonl");
+function loadQuestions(fileName: string): Question[] {
+  const file = path.join(process.cwd(), "eval", fileName);
   const now = new Date();
   const replacements: Record<string, string> = {
     "{{weekdayUtc}}": now.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }),
@@ -139,7 +144,7 @@ function summarise(label: string, outcomes: Outcome[]) {
 
   console.log(`\n${label}`);
   console.log(`  task success      ${passed}/${outcomes.length} (${percent(passed, outcomes.length)})`);
-  if (outcomes.some((o) => o.run.path === "agent")) {
+  if (outcomes.some((o) => o.run.path !== "classic")) {
     console.log(`  tool behaviour ok ${toolOk}/${outcomes.length}`);
   }
   console.log(`  answer judged ok  ${answerOk}/${outcomes.length}`);
@@ -166,15 +171,16 @@ function summarise(label: string, outcomes: Outcome[]) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  let questions = loadQuestions();
+  let questions = loadQuestions(options.file);
   if (options.only) questions = questions.filter((q) => options.only!.includes(q.id));
 
   console.log(
-    `Running ${questions.length} questions x ${options.repeat} through the agent${options.classic ? " and Classic RAG" : ""}\n`
+    `Running ${questions.length} questions (${options.file}) x ${options.repeat} through the agent${options.classic ? " and Classic RAG" : ""}${options.langgraph ? " and the LangGraph agent" : ""}\n`
   );
 
   const agentOutcomes: Outcome[] = [];
   const classicOutcomes: Outcome[] = [];
+  const langgraphOutcomes: Outcome[] = [];
 
   for (const q of questions) {
     for (let attempt = 1; attempt <= options.repeat; attempt++) {
@@ -217,22 +223,53 @@ async function main() {
           `  classic ${classicVerdict.pass ? "ok  " : "FAIL"} ${(classic.latencyMs / 1000).toFixed(1)}s ${usd(classic.costUsd)}${classicVerdict.pass ? "" : `  (${classicVerdict.reason})`}`
         );
       }
+
+      if (options.langgraph) {
+        const graphRun = await runLangGraphOnce(q.question, q.history);
+        const graphFailures = graphRun.error ? [`run failed: ${graphRun.error}`] : checkTools(graphRun, q.checks);
+        const graphVerdict = await judge(q.question, q.expect, graphRun.answer);
+        const graphOutcome: Outcome = {
+          id: q.id,
+          category: q.category,
+          run: graphRun,
+          toolFailures: graphFailures,
+          verdict: graphVerdict,
+          pass: graphFailures.length === 0 && graphVerdict.pass,
+        };
+        langgraphOutcomes.push(graphOutcome);
+
+        console.log(
+          `  langgraph ${graphOutcome.pass ? "PASS" : "FAIL"} steps=${graphRun.steps} tools=[${toolNames(graphRun).join(",")}] ${(graphRun.latencyMs / 1000).toFixed(1)}s ${usd(graphRun.costUsd)}`
+        );
+        if (!graphOutcome.pass) {
+          for (const failure of graphFailures) console.log(`       tools : ${failure}`);
+          if (!graphVerdict.pass) console.log(`       answer: ${graphVerdict.reason}`);
+          console.log(`       said  : ${oneLine(graphRun.answer, 160)}`);
+        }
+      }
     }
   }
 
   const agentSummary = summarise("AGENT", agentOutcomes);
   const classicSummary = options.classic ? summarise("CLASSIC RAG", classicOutcomes) : null;
+  const langgraphSummary = options.langgraph ? summarise("LANGGRAPH AGENT", langgraphOutcomes) : null;
 
   // Success by category, to see where each approach wins.
-  if (classicSummary) {
-    console.log("\nBY CATEGORY (task success)   agent   classic");
+  if (classicSummary || langgraphSummary) {
+    const columns = [
+      { name: "agent", outcomes: agentOutcomes },
+      ...(classicSummary ? [{ name: "classic", outcomes: classicOutcomes }] : []),
+      ...(langgraphSummary ? [{ name: "langgraph", outcomes: langgraphOutcomes }] : []),
+    ];
+
+    console.log(`\nBY CATEGORY (task success)   ${columns.map((column) => pad(column.name, 10)).join(" ")}`);
     const categories = [...new Set(questions.map((q) => q.category))];
     for (const category of categories) {
-      const a = agentOutcomes.filter((o) => o.category === category);
-      const c = classicOutcomes.filter((o) => o.category === category);
-      console.log(
-        `  ${pad(category, 24)} ${pad(`${a.filter((o) => o.pass).length}/${a.length}`, 7)} ${c.filter((o) => o.pass).length}/${c.length}`
-      );
+      const cells = columns.map((column) => {
+        const rows = column.outcomes.filter((o) => o.category === category);
+        return pad(`${rows.filter((o) => o.pass).length}/${rows.length}`, 10);
+      });
+      console.log(`  ${pad(category, 24)} ${cells.join(" ")}`);
     }
   }
 
@@ -241,6 +278,7 @@ async function main() {
     options,
     agent: { summary: agentSummary, outcomes: agentOutcomes },
     classic: classicSummary ? { summary: classicSummary, outcomes: classicOutcomes } : null,
+    langgraph: langgraphSummary ? { summary: langgraphSummary, outcomes: langgraphOutcomes } : null,
   });
   console.log(`\nSaved ${file}`);
 }
