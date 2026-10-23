@@ -28,7 +28,11 @@
     "test:langgraph-api": "tsx src/langgraph/tests/test-api.ts",
     "test:langgraph-eval": "tsx src/langgraph/tests/test-eval.ts",
     "langgraph-research": "tsx src/langgraph/research-index.ts",
-    "langgraph-report": "tsx src/langgraph/report-index.ts"
+    "langgraph-report": "tsx src/langgraph/report-index.ts",
+    "mcp:m1-trace": "tsx src/mcp/m1-wire-trace.ts",
+    "mcp:server": "tsx src/mcp/server.ts",
+    "test:mcp-tools": "tsx src/mcp/tests/test-tools.ts",
+    "test:mcp-server": "tsx src/mcp/tests/test-server.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.18",
@@ -36,6 +40,8 @@
     "@langchain/langgraph-checkpoint": "^1.2.0",
     "@langchain/langgraph-checkpoint-sqlite": "^1.1.0",
     "@langchain/openai": "^1.6.2",
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/server": "^2.3.1",
     "@qdrant/js-client-rest": "^1.19.0",
     "crypto": "^1.0.1",
     "dotenv": "^17.4.2",

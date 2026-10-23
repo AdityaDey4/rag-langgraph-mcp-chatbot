@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.1, 2026-10-23. **Plan only: nothing is built yet.** Phase M1 is next. |
+| **Status** | Draft v0.3, 2026-10-23. **Phases M1 and M2 are done** (the protocol watched on a ready-made server; our own stdio server with the three document tools). Phase M3 (resources and prompts) is next. |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how MCP works** by using each of its core ideas in real code, with every message visible. |
 | **Interface** | A command line, the MCP Inspector, Claude Code or Claude Desktop (as a host), and tests. **No browser UI.** |
@@ -50,21 +50,35 @@ Checked on 2026-10-23 from the official documentation and the npm registry. **"D
 
 | # | Fact | Source | Used in | Run here |
 |---|---|---|---|---|
-| 1 | The current protocol revision is **2026-07-28** | docs | all | ⬜ |
-| 2 | Messages are **JSON-RPC 2.0**. This revision is **stateless**: every request is self-contained and carries its protocol version and client capabilities in `_meta`. Earlier revisions used a connection-scoped session with an `initialize` handshake; clients and servers detect the other side's era and fall back | docs | M1, M2 | ⬜ |
-| 3 | A **server** can offer three features: **tools** (functions the model calls), **resources** (data to read) and **prompts** (templates for the user). A **client** can offer **elicitation** (the server asks the user for more input). Optional, opt-in extensions: Tasks, Skills over MCP, MCP Apps | docs | M1, M3 | ⬜ |
-| 4 | Two standard **transports**. **stdio:** newline-delimited JSON-RPC over the standard streams of a subprocess that the client launches. **Streamable HTTP:** each message is an HTTP POST to one endpoint, and the reply is a JSON object or a request-scoped SSE stream. Cancel: a `notifications/cancelled` message on stdio, closing the response stream on HTTP | docs | M1, M2, M6 | ⬜ |
-| 5 | **A stdio server must never write to stdout** (`console.log` corrupts the messages). Use `console.error` (stderr) or a file. HTTP servers may log to stdout | docs | M2 | ⬜ |
-| 6 | TypeScript SDK **v2** is split into packages: `@modelcontextprotocol/server` (2.3.1), `@modelcontextprotocol/client` (2.3.1) and `@modelcontextprotocol/core` (2.3.1). They need Node 20 or newer and zod 4. The older single package `@modelcontextprotocol/sdk` (1.32.1) is still published (v1) | npm | M2, M4 | ⬜ |
-| 7 | **Server API (docs):** `import { McpServer } from "@modelcontextprotocol/server"` and `import { serveStdio } from "@modelcontextprotocol/server/stdio"`. A tool is `server.registerTool(name, { description, inputSchema: z.object({...}) }, async (args) => ({ content: [{ type: "text", text }] }))`. Start with `serveStdio(createServer, { onerror })`, where `createServer()` must return a **new** `McpServer` on every call. Wiring it by hand with `server.connect(new StdioServerTransport())` compiles but only serves 2025-era clients | docs | M2 | ⬜ |
-| 8 | **Client API (docs):** `import { Client } from "@modelcontextprotocol/client"` and `import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"`. `new Client({ name, version })`, `await client.connect(transport)`, `await client.listTools()`, `await client.callTool({ name, arguments })`, `await client.close()` | docs | M4 | ⬜ |
-| 9 | **MCP Inspector** (`@modelcontextprotocol/inspector`, 2.12.0): `npx @modelcontextprotocol/inspector --cli node build/index.js --protocol-era modern --method tools/list` lists a server's tools from the command line | docs, npm | M1, M2 | ⬜ |
-| 10 | **Claude Desktop** loads servers from `claude_desktop_config.json` (Windows: `%AppData%\Claude\claude_desktop_config.json`) with `{ "mcpServers": { "name": { "command": "node", "args": ["C:\\path\\to\\index.js"] } } }` (the backslashes are doubled because it is JSON). The server must be built first | docs | M2 | ⬜ |
+| 1 | The current protocol revision is **2026-07-28** | docs | all | ◐ the Inspector pins this version in `modern` mode (fact 14) |
+| 2 | Messages are **JSON-RPC 2.0**. This revision is **stateless**: every request is self-contained and carries its protocol version and client capabilities in `_meta`. Earlier revisions used a connection-scoped session with an `initialize` handshake; clients and servers detect the other side's era and fall back | docs | M1, M2 | ◐ JSON-RPC and the old handshake ✅ (facts 15, 16); the stateless era needs a server that speaks it (M2) |
+| 3 | A **server** can offer three features: **tools** (functions the model calls), **resources** (data to read) and **prompts** (templates for the user). A **client** can offer **elicitation** (the server asks the user for more input). Optional, opt-in extensions: Tasks, Skills over MCP, MCP Apps | docs | M1, M3 | ◐ tools ✅ (fact 17); resources and prompts in M3 |
+| 4 | Two standard **transports**. **stdio:** newline-delimited JSON-RPC over the standard streams of a subprocess that the client launches. **Streamable HTTP:** each message is an HTTP POST to one endpoint, and the reply is a JSON object or a request-scoped SSE stream. Cancel: a `notifications/cancelled` message on stdio, closing the response stream on HTTP | docs | M1, M2, M6 | ◐ stdio ✅ (fact 19); HTTP in M6 |
+| 5 | **A stdio server must never write to stdout** (`console.log` corrupts the messages). Use `console.error` (stderr) or a file. HTTP servers may log to stdout | docs | M2 | ✅ seen in a real server (fact 19); breaking it on purpose is a test in M2 |
+| 6 | TypeScript SDK **v2** is split into packages: `@modelcontextprotocol/server` (2.3.1), `@modelcontextprotocol/client` (2.3.1) and `@modelcontextprotocol/core` (2.3.1). They need Node 20 or newer and zod 4. The older single package `@modelcontextprotocol/sdk` (1.32.1) is still published (v1) | npm | M2, M4 | ✅ installed in M2 (facts 22, 28) |
+| 7 | **Server API (docs):** `import { McpServer } from "@modelcontextprotocol/server"` and `import { serveStdio } from "@modelcontextprotocol/server/stdio"`. A tool is `server.registerTool(name, { description, inputSchema: z.object({...}) }, async (args) => ({ content: [{ type: "text", text }] }))`. Start with `serveStdio(createServer, { onerror })`, where `createServer()` must return a **new** `McpServer` on every call. Wiring it by hand with `server.connect(new StdioServerTransport())` compiles but only serves 2025-era clients | docs | M2 | ✅ (fact 22) |
+| 8 | **Client API (docs):** `import { Client } from "@modelcontextprotocol/client"` and `import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"`. `new Client({ name, version })`, `await client.connect(transport)`, `await client.listTools()`, `await client.callTool({ name, arguments })`, `await client.close()` | docs | M4 | ✅ in the M2 tests (fact 28) |
+| 9 | **MCP Inspector** (`@modelcontextprotocol/inspector`, 2.12.0): `npx @modelcontextprotocol/inspector --cli node build/index.js --protocol-era modern --method tools/list` lists a server's tools from the command line | docs, npm | M1, M2 | ✅ (fact 20) |
+| 10 | **Claude Desktop** loads servers from `claude_desktop_config.json` (Windows: `%AppData%\Claude\claude_desktop_config.json`) with `{ "mcpServers": { "name": { "command": "node", "args": ["C:\\path\\to\\index.js"] } } }` (the backslashes are doubled because it is JSON). The server must be built first | docs | M2 | ◐ the config for this server is written below; no host was tried |
 | 11 | `@langchain/mcp-adapters` **2.0.1**: Node 20.10 or newer, peers `@langchain/core` ^1.2.6 and `@langchain/langgraph` ^1.4.18 (this project has 1.5.0), and it depends on `@modelcontextprotocol/client` ^2.2.0. `new MultiServerMCPClient({ math: { transport: "stdio", command: "node", args: [path] } })` and `await client.getTools()` give LangChain tools. It is stateless by default: every tool call opens a fresh session and closes it | npm, LangChain docs | M4 | ⬜ |
 | 12 | **Security (spec):** hosts must get the user's explicit consent before invoking any tool, and descriptions or annotations of tools must be treated as **untrusted** unless the server is trusted. MCP itself cannot enforce this, so the host must | docs | M5 | ⬜ |
 | 13 | This machine: Node 22.20 (needs 20 or newer), Windows, Qdrant in Docker for the search tools | checked | all | ✅ |
+| 14 | **The reference filesystem server (`@modelcontextprotocol/server-filesystem` 2.0.0) speaks only the older era.** `server/discover` gets `-32601 Method not found`. The Inspector with `--protocol-era modern` fails with "the server did not offer pinned protocol version 2026-07-28 via server/discover (no fallback in pin mode)". With `legacy` or `auto` it works. So not every server speaks the current revision, and a client has to handle both | run in M1 | M2, M4, M5 | ✅ |
+| 15 | **Messages on stdio** are one JSON-RPC 2.0 object per line. A **request** has an `id` and the reply has the same `id`. A **notification** (for example `notifications/initialized`) has no `id` and gets no reply. A failed method is a JSON-RPC **error** (`{ "error": { "code": -32601, "message": "Method not found" } }`) | run in M1 | M1, M2, M4 | ✅ |
+| 16 | **The older handshake:** the client sends `initialize` (`protocolVersion`, `capabilities`, `clientInfo`); the server replies with its own `protocolVersion`, `capabilities` and `serverInfo`; the client then sends `notifications/initialized`. This server answered `capabilities: { tools: { listChanged: true } }` only, so it offers **no resources and no prompts** | run in M1 | M2, M4 | ✅ |
+| 17 | **A tool definition** (`tools/list`) has `name`, `title`, `description`, `inputSchema` (JSON Schema draft 2020-12), `outputSchema`, `annotations` and `execution`. The annotations are hints: `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`. The filesystem server lists **14 tools** (10 read-only, 4 that can change data: `write_file`, `edit_file`, `create_directory`, `move_file`). The list is **13,157 characters**, roughly 3,300 tokens (an estimate), so offering every tool to a model costs tokens on every call | run in M1 | M4, M5, M6 | ✅ |
+| 18 | **A tool call result** has `content` (a list of typed blocks, here `text`) and optionally `structuredContent`. **A tool failure is a normal result with `isError: true`**, not a JSON-RPC error: a path outside the allowed folder gave `Access denied - path outside allowed directories…`, and a missing argument gave `MCP error -32602: Input validation error…` inside the text. The Inspector turns both into the error `tool_is_error`, and an unknown tool name into `tool_not_found` | run in M1 | M2, M4, M5 | ✅ |
+| 19 | **A stdio server writes its own log lines to stderr** ("Secure MCP Filesystem Server running on stdio") and only messages to stdout. This server also asks the client for **roots** (the folders it may use); when the client has no roots support it falls back to the folder given on its command line | run in M1 | M2, M5 | ✅ |
+| 20 | **Inspector 2.12.0 CLI:** `npx @modelcontextprotocol/inspector --cli <command and arguments of the server> --method tools/list`, and `--method tools/call --tool-name <name> --tool-arg key=value`. `-q` hides everything except the result, `--output <file>` writes it to a file, `--format json` prints JSON. **A command given on the line defaults to the `legacy` era**; use `--protocol-era auto` or `modern` for the current one. There are also `resources/read`, `prompts/get`, a load test (`--load`) and HTTP options (`--server-url`, `--header`) | run in M1 | M2 to M6 | ✅ |
+| 21 | On Windows a Node script starts the server with `spawn("npx", [...], { shell: true })`; without `shell: true` the `npx` command is not found | run in M1 | M2, M4 | ✅ |
+| 22 | **The server API works as the documentation says.** `McpServer` and `registerTool(name, { description, inputSchema: z.object({...}) }, handler)` from `@modelcontextprotocol/server` 2.3.1, started with `serveStdio(createServer, { onerror })` from `@modelcontextprotocol/server/stdio`. A handler returns `{ content: [{ type: "text", text }], isError? }`; its argument type is inferred from the zod schema, so `tsc` accepts `(args) => searchDocuments(args)`. The SDK is ESM-only, and it loads fine from this project's CommonJS scripts under `tsx` on Node 22.20 | run in M2 | M2 to M5 | ✅ |
+| 23 | **A zod schema becomes the tool's JSON Schema (2020-12) by itself**: `.min()` and `.max()` on a string become `minLength` and `maxLength`, on a number `minimum` and `maximum`, `.describe()` becomes `description`, and an `.optional()` field is left out of `required`. An empty `z.object({})` becomes `{ "type": "object", "properties": {} }` | run in M2 | M2, M4 | ✅ |
+| 24 | **Our server answers clients of both eras**: the Inspector with `--protocol-era modern`, `auto` and `legacy` all list the three tools. In the modern era every result carries `_meta["io.modelcontextprotocol/serverInfo"]` (`{ name: "rag-documents", version: "1.0.0" }`), because there is no handshake to tell the client who answered | run in M2 | M2, M4 | ✅ |
+| 25 | **Failures are results, as in fact 18.** A tool that fails returns `isError: true` with the message (`Error: No passage found with chunkId "…"`). The SDK's own argument check does the same: `Input validation error: Invalid arguments for tool search_documents: query: Invalid input: expected string, received undefined` comes back as an `isError` result, not a JSON-RPC error. A chunk id that is not a UUID gives `Error: Bad Request` (Qdrant's own message, the same weak message as in the LangGraph tool) | run in M2 | M2, M4, M5 | ✅ |
+| 26 | **`dotenv` 17 prints a line to stdout** when it loads `.env` ("injecting env…"), which would corrupt the protocol, so `config.ts` uses `quiet: true`. A test starts the server and checks that stdout stays empty and the log line "running on stdio" goes to stderr. Under `tsx` the first start takes a few seconds, so the test waits for that line | run in M2 | M2 | ✅ |
+| 27 | **A host starts the server from another working directory**, so `.env` is found from the file's location (`__dirname`), not from the working directory. Checked by starting the server with absolute paths from the temp folder: `search_documents` worked | run in M2 | M2 | ✅ |
 
-**Not known yet** (to be found by running it): how `serveStdio` behaves on Windows, the exact `registerTool` and `registerResource` signatures in the installed version, the prompts API, how a Streamable HTTP server is started with the v2 package, what the authentication helpers look like, whether `@langchain/mcp-adapters` works with this project's LangGraph graph, and how `@modelcontextprotocol/server-filesystem` (2.0.0) is started.
+**Not known yet** (to be found by running it): the `registerResource` and prompt signatures in the installed version (M3), how a client copes with servers of both eras (M4), whether `@langchain/mcp-adapters` works with this project's LangGraph graph (M4), how a Streamable HTTP server is started with the v2 package and what the authentication helpers look like (M6), and how a real host (Claude Code or Claude Desktop) shows the server (not tried). (How the filesystem server is started is now known: fact 20.)
 
 ---
 
@@ -143,12 +157,12 @@ MCP is hard to understand from code alone, so each phase shows the messages:
 
 ```
 src/mcp/
-  config.ts           copy: collection name, embedding model
-  log.ts              stderr logger (stdout is the protocol channel)
-  retrieval.ts        copy: search, get one chunk, list documents (Qdrant + embeddings)
-  prompt.ts           copy: the untrusted-result wrapper (and the system prompt for M4)
-  tools/              the three document tools, in MCP format          (M2)
-  server.ts           stdio entry point                                 (M2)
+  config.ts           copy: collection name, embedding model; loads .env from the project root        (M2, exists)
+  log.ts              stderr logger (stdout is the protocol channel)                                  (M2, exists)
+  retrieval.ts        copy: search, get one chunk, list documents (Qdrant + embeddings)               (M2, exists)
+  prompt.ts           copy: the untrusted-result wrapper (and the system prompt for M4)               (M2, exists)
+  tools/              search-documents.ts, get-chunk.ts, list-documents.ts, in MCP format             (M2, exists)
+  server.ts           stdio entry point                                                               (M2, exists)
   resources.ts        document sections as resources                    (M3)
   prompts.ts          prompt templates                                  (M3)
   client.ts           connect, list tools, call a tool                  (M4)
@@ -156,13 +170,14 @@ src/mcp/
   agent.ts            the small graph with MCP tools                    (M4)
   safety.ts           allowlist, approval list, limits, output check    (M5)
   http-server.ts      Streamable HTTP entry point                       (M6)
+  m1-wire-trace.ts    M1: raw messages to a ready-made server, printed (learning script, exists)
   tests/              offline tests and protocol tests
 docs/MCP-SPEC.md      this file
 ```
 
-**Planned scripts** (added by the phase that needs them): `mcp:server` (run the server), `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
+**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `test:mcp-tools`, `test:mcp-server`. **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
 
-**Planned dependencies** (added in the phase that first needs them): `@modelcontextprotocol/server` (M2), `@modelcontextprotocol/client` (M4), `@modelcontextprotocol/inspector` as a dev tool (M1 or M2). `@langchain/mcp-adapters` only if M4's comparison step is done.
+**Dependencies:** `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (both 2.3.1, installed in M2; the client is needed by the protocol tests, and M4 uses it again). The Inspector is run with `npx` and is not installed. `@langchain/mcp-adapters` only if M4's comparison step is done.
 
 ---
 
@@ -170,7 +185,7 @@ docs/MCP-SPEC.md      this file
 
 Each phase: **topics**, a **practical task**, an **outcome**, how it is **checked**, and a **record** that is filled in when the phase is done.
 
-### Phase M1: The protocol, with no code of ours ⏭️ *next lesson*
+### Phase M1: The protocol, with no code of ours ✅
 
 Learn what MCP is by watching a ready-made server.
 
@@ -187,11 +202,52 @@ Learn what MCP is by watching a ready-made server.
 
 **Design:** sections 2 and 3, facts 1 to 5, 9.
 
-**Record:** (empty)
+**Record (done 2026-10-23)**
+
+*What was run.* The reference filesystem server (`@modelcontextprotocol/server-filesystem` 2.0.0) on a temporary folder, from a scratch directory outside the project, through the Inspector 2.12.0 CLI:
+
+```bash
+npx @modelcontextprotocol/inspector --cli npx -y @modelcontextprotocol/server-filesystem <folder> --method tools/list --protocol-era legacy -q
+npx @modelcontextprotocol/inspector --cli npx -y @modelcontextprotocol/server-filesystem <folder> --method tools/call --tool-name read_text_file --tool-arg path=<folder>/notes.txt --protocol-era legacy -q
+```
+
+The Inspector hides the messages, so a small script, `src/mcp/m1-wire-trace.ts` (`npm run mcp:m1-trace`), starts the same server and writes the raw messages itself. This is the message flow of one tool call, as it ran (long lines cut):
+
+```
+1. CLIENT -> SERVER  {"jsonrpc":"2.0","id":1,"method":"server/discover","params":{}}
+   SERVER -> CLIENT  {"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}      <- this server is older than 2026-07-28
+
+2. CLIENT -> SERVER  {"jsonrpc":"2.0","id":2,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"m1-wire-trace","version":"0.0.1"}}}
+   SERVER -> CLIENT  {"result":{"protocolVersion":"2025-06-18","capabilities":{"tools":{"listChanged":true}},"serverInfo":{"name":"secure-filesystem-server","version":"1.0.0"}},"jsonrpc":"2.0","id":2}
+
+3. CLIENT -> SERVER  {"jsonrpc":"2.0","method":"notifications/initialized"}                                <- no id, no reply
+
+4. CLIENT -> SERVER  {"jsonrpc":"2.0","id":3,"method":"tools/list","params":{}}
+   SERVER -> CLIENT  {"result":{"tools":[{"name":"read_file","title":"Read File (Deprecated)","description":"…","inputSchema":{…}, …}, … 14 tools]},"jsonrpc":"2.0","id":3}   (13,157 characters)
+
+5. CLIENT -> SERVER  {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"<folder>/notes.txt"}}}
+   SERVER -> CLIENT  {"result":{"content":[{"type":"text","text":"Kafka is a distributed event-streaming platform.\n…"}],"structuredContent":{"content":"…"}},"jsonrpc":"2.0","id":4}
+
+6. CLIENT -> SERVER  {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"read_text_file","arguments":{"path":"C:/Windows/win.ini"}}}
+   SERVER -> CLIENT  {"result":{"content":[{"type":"text","text":"Access denied - path outside allowed directories: …"}],"isError":true},"jsonrpc":"2.0","id":5}
+```
+
+*Every field of a tool call.* `jsonrpc` is always `"2.0"`. `id` ties a reply to its request. `method` says what to do (`tools/call`). `params.name` is the tool and `params.arguments` its arguments, checked against the tool's `inputSchema`. The result has `content` (typed blocks the model can read) and `structuredContent` (the same data as JSON); a failure is `isError: true` inside a normal result. Anything that is not a tool failure (an unknown method) is a JSON-RPC `error` with a code.
+
+*Outcome check.* The flow above is drawn from a real server, not from the documentation, and facts 14 to 21 were found by running it.
+
+*What surprised me.*
+- **The reference server does not speak the current revision.** The Inspector in `modern` mode refuses it. Our server in M2 will use `serveStdio`, which answers both eras, and our client in M4 must cope with servers of both eras (like this one).
+- **Tool failures are not errors.** The server returns a normal result with `isError: true`; the model gets text it can read. This matches how the LangGraph agent already turns failed tools into messages.
+- **A server's tool list is big.** 14 tools are about 13 KB, so an allowlist (M5) is also a cost control (M6).
+- **Four of the 14 tools can change data** and carry `destructiveHint`. Hints are untrusted, so the approval list in M5 must not rely on them alone.
+
+*Not checked.* The stateless era on the wire (needs a server that supports it: M2). Resources, prompts and HTTP (M3, M6). Claude Code or Claude Desktop as a host (M2).
+
 
 ---
 
-### Phase M2: Build a server (stdio)
+### Phase M2: Build a server (stdio) ✅
 
 Expose the document tools so any MCP client can use them.
 
@@ -209,11 +265,66 @@ Expose the document tools so any MCP client can use them.
 
 **Design:** sections 3 and 4, facts 5 to 10.
 
-**Record:** (empty)
+**Record (done 2026-10-23)**
+
+*What was built.* Files in `src/mcp/`:
+
+| File | What it is |
+|---|---|
+| `config.ts`, `retrieval.ts`, `prompt.ts` | Copies of the LangGraph versions (collection name and embedding model, search, get one chunk, list documents, the untrusted-result wrapper), so the folder stands alone. `config.ts` loads `.env` from the project root by the file's location, with `quiet: true` |
+| `log.ts` | `log(text)` writes to **stderr** |
+| `tools/search-documents.ts`, `get-chunk.ts`, `list-documents.ts` | Each exports a description, a zod schema and a plain function (`searchDocuments`, `getChunk`, `listDocuments`). The function takes the real lookup as an optional last argument, so tests can pass a fake. A failure is returned as `isError: true`, never thrown |
+| `server.ts` | `createServer()` makes a new `McpServer` and registers the three tools by name, with their description and schema. `serveStdio(createServer, { onerror })` serves it over stdio |
+
+The tools behave like the ones in `src/langgraph/tools/`; the differences are the MCP result format (`content` blocks and `isError`) and that errors are returned instead of thrown.
+
+*How to run it.* `npm run mcp:server` starts it (it waits for a client on stdin). With the Inspector (the `modern` era is the current revision):
+
+```bash
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --method tools/list --protocol-era modern -q
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --method tools/call --tool-name search_documents --tool-args-json '{"query":"What is Kafka?","topK":1}' --protocol-era modern -q
+```
+
+*Host configuration (written, not tried in a real host).* For Claude Desktop, in `%AppData%\Claude\claude_desktop_config.json`; the server is started by `node` running the project's own `tsx`, with absolute paths, so no build step is needed:
+
+```json
+{
+  "mcpServers": {
+    "rag-documents": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\DELL\\Documents\\rag-chatbot\\node_modules\\tsx\\dist\\cli.mjs",
+        "C:\\Users\\DELL\\Documents\\rag-chatbot\\src\\mcp\\server.ts"
+      ]
+    }
+  }
+}
+```
+
+For Claude Code the same command is added with `claude mcp add rag-documents -- node <path to tsx cli.mjs> <path to server.ts>` (the command form is from memory, not run). Docker and Qdrant must be running for the search tools to work.
+
+*What was checked.*
+
+| Check | Result |
+|---|---|
+| `test:mcp-tools` (14 tests, offline): the folder imports nothing from outside; search returns the passages best first, asks for 4 unless `topK` says otherwise, cuts long passages at 1200 characters, treats "no passages" as a normal result, and returns a failure as `isError`; the same for `get_chunk` (unknown id) and `list_documents`; a passage cannot close the wrapper early | 14 passed |
+| `test:mcp-server` (6 tests): the server is started as a subprocess and used through the SDK client: it lists the three tools with descriptions and schemas, a call with a missing argument is an error result, it still answers afterwards, nothing is written to stdout and the log line goes to stderr, and with Qdrant up `list_documents` and `search_documents` followed by `get_chunk` work | 6 passed |
+| Inspector, `modern` era: `tools/list`, then `list_documents`, `search_documents`, `get_chunk` with an unknown id, with a non-UUID id and `search_documents` with no query | all as in facts 22 to 25 |
+| Inspector, `legacy` era: `tools/list` | the same three tools |
+| Server started from the temp folder with absolute paths (as a host does) | worked; `.env` was found |
+
+*What surprised me.*
+- **`dotenv` printed to stdout.** The first idea, `import "dotenv/config"` as in the LangGraph folder, would have broken a stdio server. It needed `quiet: true`, and a test now guards it.
+- **A schema is written once.** The zod object gives the model's tool definition, the argument check and the TypeScript type of the handler, all from one place.
+- **Errors need no special code.** The SDK turns a thrown error or a bad argument into an `isError` result by itself, but a returned `isError` result lets us write a clear message, so the tools catch and return.
+- **Plain functions, not tool objects.** Keeping each tool as a plain function with a description and a schema made the server file read like a catalog, and made the tests simple.
+
+*Not checked.* A real host (Claude Code or Claude Desktop) using the server; the config above is untested. The learning script `m1-wire-trace.ts` was left in the folder (it only runs the filesystem server).
+
 
 ---
 
-### Phase M3: Resources and prompts
+### Phase M3: Resources and prompts ⏭️ *next lesson*
 
 Learn the other two server features.
 
@@ -327,10 +438,10 @@ The same rules as in the LangGraph evaluation: the same questions, the same judg
 
 ### Open decisions (proposed answers, to be confirmed before the phase that needs them)
 
-1. **Which SDK:** the v2 packages (`@modelcontextprotocol/server` and `/client`) that the current documentation uses. The old `@modelcontextprotocol/sdk` (1.x) is not used. *Proposed. Decided in M2.*
+1. ~~Which SDK.~~ **Decided in M2: the v2 packages** (`@modelcontextprotocol/server` and `/client`, 2.3.1), as in the current documentation. The old `@modelcontextprotocol/sdk` (1.x) is not used.
 2. **Adapter:** write `adapter.ts` by hand first, then try `@langchain/mcp-adapters` and compare. *Proposed. Decided in M4.*
-3. **Host for the real test in M2:** the MCP Inspector is required; Claude Code or Claude Desktop is the extra. *To be chosen in M2.*
-4. **Third-party server in M5:** the reference filesystem server on a sample folder. *To be confirmed in M5.*
+3. ~~Host for the real test in M2.~~ **The Inspector was used.** A real host (Claude Code or Claude Desktop) is still open: the config is written and untested.
+4. **Third-party server in M5:** the reference filesystem server on a sample folder. *To be confirmed in M5.* (M1 showed it works in the older era only, which is fine for M5 as long as the client handles both.)
 5. **Authentication in M6:** a static bearer token is built; OAuth is only described. *Proposed.*
 6. **Where the HTTP server runs in M6:** a separate Node process, not a Next.js route. *Proposed.*
 7. **Whether `src/mcp/agent.ts` keeps approval, memory and streaming:** no; only the small loop, plus approval in M5. *Proposed.*
@@ -356,9 +467,9 @@ The same rules as in the LangGraph evaluation: the same questions, the same judg
 
 Items are checked off as phases complete.
 
-- [ ] The message flow of one tool call is written down from a real server, with every field explained. *(M1)*
-- [ ] `src/mcp/` imports nothing from outside itself (enforced by a test), and nothing in it writes to stdout in the server.
-- [ ] The three document tools work over stdio: tested offline, through the Inspector and from a host. *(M2)*
+- [x] The message flow of one tool call is written down from a real server, with every field explained. *(M1: the Phase M1 record)*
+- [x] `src/mcp/` imports nothing from outside itself (enforced by `test:mcp-tools`), and the server writes nothing to stdout (enforced by `test:mcp-server`).
+- [x] The three document tools work over stdio: tested offline and through the Inspector in both protocol eras; **a real host was not tried**. *(M2)*
 - [ ] Resources and a prompt are served and read. *(M3)*
 - [ ] An agent answers a question using tools that come from the server, and the hand-written adapter is compared with `@langchain/mcp-adapters`. *(M4)*
 - [ ] A third-party server is connected behind an allowlist and an approval rule; hostile, hanging and oversized results are tested. *(M5)*
