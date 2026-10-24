@@ -50,7 +50,7 @@ async function qdrantIsUp() {
   }
 }
 
-// Example: runs every test, then prints "6 passed, 0 failed"
+// Example: runs every test, then prints "13 passed, 0 failed"
 async function main() {
   console.log("what the server offers");
 
@@ -88,6 +88,43 @@ async function main() {
     await client.close();
 
     assert.equal(tools.length, 3);
+  });
+
+  console.log("resources and prompts (no Qdrant needed)");
+
+  await test("the server says it offers tools, resources and prompts", async () => {
+    const client = await connect();
+    const capabilities = client.getServerCapabilities();
+    await client.close();
+
+    assert.ok(capabilities?.tools, "tools");
+    assert.ok(capabilities?.resources, "resources");
+    assert.ok(capabilities?.prompts, "prompts");
+  });
+
+  await test("the section resources are offered as a template with one variable", async () => {
+    const client = await connect();
+    const { resourceTemplates } = await client.listResourceTemplates();
+    await client.close();
+
+    assert.deepEqual(resourceTemplates.map((template) => template.uriTemplate), ["rag://sections/{section}"]);
+  });
+
+  await test("the prompt is listed with its required argument", async () => {
+    const client = await connect();
+    const { prompts } = await client.listPrompts();
+    await client.close();
+
+    assert.deepEqual(prompts.map((prompt) => prompt.name), ["summarize_section"]);
+    assert.deepEqual(prompts[0].arguments?.map((argument) => [argument.name, argument.required]), [["section", true]]);
+  });
+
+  await test("a prompt without its argument is refused, and so is an address that is not a resource", async () => {
+    const client = await connect();
+
+    await assert.rejects(client.getPrompt({ name: "summarize_section" }), /section/);
+    await assert.rejects(client.readResource({ uri: "file:///etc/passwd" }), /not found/i);
+    await client.close();
   });
 
   console.log("stdout is only for protocol messages");
@@ -135,6 +172,39 @@ async function main() {
 
       assert.notEqual(chunk.isError, true);
       assert.match(JSON.stringify(chunk.content), /event-streaming/);
+    });
+
+    await test("the list of resources has the documents and one resource for each section", async () => {
+      const client = await connect();
+      const { resources } = await client.listResources();
+      await client.close();
+
+      const uris = resources.map((resource) => resource.uri);
+      assert.ok(uris.includes("rag://documents"));
+      assert.ok(uris.includes("rag://sections/Kafka"));
+      assert.ok(uris.includes("rag://sections/DBMS"));
+    });
+
+    await test("reading the section DBMS returns both of its passages, and an unknown section is an error", async () => {
+      const client = await connect();
+      const result = await client.readResource({ uri: "rag://sections/DBMS" });
+      const text = "text" in result.contents[0] ? result.contents[0].text : "";
+
+      assert.match(text, /Database Management System/); // page 1
+      assert.match(text, /system design/); // page 2
+      await assert.rejects(client.readResource({ uri: "rag://sections/Nope" }), /No section called "Nope"/);
+      await client.close();
+    });
+
+    await test("the prompt for n8n returns the instruction and the section text as an attached resource", async () => {
+      const client = await connect();
+      const result = await client.getPrompt({ name: "summarize_section", arguments: { section: "n8n" } });
+      await client.close();
+
+      assert.equal(result.messages.length, 2);
+      assert.equal(result.messages[0].content.type, "text");
+      assert.equal(result.messages[1].content.type, "resource");
+      assert.match(JSON.stringify(result.messages[1].content), /workflow/);
     });
   } else {
     console.log("  skipped: Qdrant or the OpenAI key is not available");

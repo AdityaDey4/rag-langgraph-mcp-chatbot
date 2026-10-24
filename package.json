@@ -32,7 +32,8 @@
     "mcp:m1-trace": "tsx src/mcp/m1-wire-trace.ts",
     "mcp:server": "tsx src/mcp/server.ts",
     "test:mcp-tools": "tsx src/mcp/tests/test-tools.ts",
-    "test:mcp-server": "tsx src/mcp/tests/test-server.ts"
+    "test:mcp-server": "tsx src/mcp/tests/test-server.ts",
+    "test:mcp-resources": "tsx src/mcp/tests/test-resources.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.18",

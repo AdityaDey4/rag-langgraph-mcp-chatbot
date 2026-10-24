@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.3, 2026-10-23. **Phases M1 and M2 are done** (the protocol watched on a ready-made server; our own stdio server with the three document tools). Phase M3 (resources and prompts) is next. |
+| **Status** | Draft v0.4, 2026-10-23. **Phases M1 to M3 are done** (the protocol watched on a ready-made server; our own stdio server with the three document tools; resources and a prompt). Phase M4 (a client, and an agent that uses MCP tools) is next. |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how MCP works** by using each of its core ideas in real code, with every message visible. |
 | **Interface** | A command line, the MCP Inspector, Claude Code or Claude Desktop (as a host), and tests. **No browser UI.** |
@@ -77,8 +77,15 @@ Checked on 2026-10-23 from the official documentation and the npm registry. **"D
 | 25 | **Failures are results, as in fact 18.** A tool that fails returns `isError: true` with the message (`Error: No passage found with chunkId "…"`). The SDK's own argument check does the same: `Input validation error: Invalid arguments for tool search_documents: query: Invalid input: expected string, received undefined` comes back as an `isError` result, not a JSON-RPC error. A chunk id that is not a UUID gives `Error: Bad Request` (Qdrant's own message, the same weak message as in the LangGraph tool) | run in M2 | M2, M4, M5 | ✅ |
 | 26 | **`dotenv` 17 prints a line to stdout** when it loads `.env` ("injecting env…"), which would corrupt the protocol, so `config.ts` uses `quiet: true`. A test starts the server and checks that stdout stays empty and the log line "running on stdio" goes to stderr. Under `tsx` the first start takes a few seconds, so the test waits for that line | run in M2 | M2 | ✅ |
 | 27 | **A host starts the server from another working directory**, so `.env` is found from the file's location (`__dirname`), not from the working directory. Checked by starting the server with absolute paths from the temp folder: `search_documents` worked | run in M2 | M2 | ✅ |
+| 28 | **Registering resources and a prompt works as the types say.** A fixed resource: `server.registerResource(name, "rag://documents", { title, description, mimeType }, (uri) => ({ contents: [{ uri: uri.href, mimeType, text }] }))`. A template: `new ResourceTemplate("rag://sections/{section}", { list: () => ({ resources: [...] }) })` with a read callback `(uri, variables)`; the `list` option must be given (it may be `undefined`). A prompt: `server.registerPrompt(name, { title, description, argsSchema: z.object({...}) }, (args) => ({ messages: [...] }))` | run in M3 | M3 | ✅ |
+| 29 | **`resources/list`** returns the fixed resources and the ones from every template's `list` callback together, each with `name`, `title`, `uri`, `description` and `mimeType`. **`resources/templates/list`** returns the templates (`name`, `title`, `uriTemplate`, `description`). Our 6 sections gave 7 resources: the document list and one per section | run in M3 | M3 | ✅ |
+| 30 | **`resources/read`** returns `contents: [{ uri, mimeType, text }]`. In the modern era the result also has the cache hints `ttlMs: 0` and `cacheScope: "private"`, and the `_meta` with the server's name and version (as in fact 24) | run in M3 | M3, M4 | ✅ |
+| 31 | **`prompts/list`** gives `name`, `title`, `description` and `arguments: [{ name, description, required }]`, built from the zod schema. **`prompts/get`** returns `messages`, each with a `role` and **one** content block; a block can be `text` or an embedded `resource` (`{ type: "resource", resource: { uri, mimeType, text } }`). Our prompt returns the instruction as text and then the section as an attached resource | run in M3 | M3, M4 | ✅ |
+| 32 | **Errors for resources and prompts are protocol errors, not `isError` results.** An unknown section: `No section called "Nope".`; an address that is not a resource: `Resource not found: file:///etc/passwd`; a prompt without its argument: `Invalid arguments for prompt summarize_section: section: Invalid input: expected string, received undefined`. The SDK client rejects with them, and the Inspector shows `{"error": …}`. Only tool calls use `isError` (facts 18 and 25) | run in M3 | M3, M4 | ✅ |
+| 33 | **The capabilities follow the registrations.** After the first `registerTool`, `registerResource` and `registerPrompt`, the client sees `tools`, `resources` and `prompts` in `getServerCapabilities()`; the filesystem server of fact 16 only had `tools` | run in M3 | M3, M4 | ✅ |
+| 34 | **A failing template list breaks the whole `resources/list`.** With Qdrant unreachable, `resources/list` returns an error (`fetch failed`) and even the fixed resource is not listed; `resources/read rag://documents` fails the same way, while a tool call would return an `isError` result. A real server could catch the error in the list callback and return only the fixed resources; this one does not | run in M3 | M3, M5 | ✅ |
 
-**Not known yet** (to be found by running it): the `registerResource` and prompt signatures in the installed version (M3), how a client copes with servers of both eras (M4), whether `@langchain/mcp-adapters` works with this project's LangGraph graph (M4), how a Streamable HTTP server is started with the v2 package and what the authentication helpers look like (M6), and how a real host (Claude Code or Claude Desktop) shows the server (not tried). (How the filesystem server is started is now known: fact 20.)
+**Not known yet** (to be found by running it): how a client copes with servers of both eras (M4), whether `@langchain/mcp-adapters` works with this project's LangGraph graph (M4), how a Streamable HTTP server is started with the v2 package and what the authentication helpers look like (M6), and how a real host (Claude Code or Claude Desktop) shows the server (not tried). (How the filesystem server is started is now known: fact 20.)
 
 ---
 
@@ -163,8 +170,8 @@ src/mcp/
   prompt.ts           copy: the untrusted-result wrapper (and the system prompt for M4)               (M2, exists)
   tools/              search-documents.ts, get-chunk.ts, list-documents.ts, in MCP format             (M2, exists)
   server.ts           stdio entry point                                                               (M2, exists)
-  resources.ts        document sections as resources                    (M3)
-  prompts.ts          prompt templates                                  (M3)
+  resources.ts        the document list and the sections as resources                                (M3, exists)
+  prompts.ts          the summarize_section prompt                                                   (M3, exists)
   client.ts           connect, list tools, call a tool                  (M4)
   adapter.ts          MCP tool → LangChain tool                         (M4)
   agent.ts            the small graph with MCP tools                    (M4)
@@ -175,7 +182,7 @@ src/mcp/
 docs/MCP-SPEC.md      this file
 ```
 
-**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `test:mcp-tools`, `test:mcp-server`. **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
+**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `test:mcp-tools`, `test:mcp-resources`, `test:mcp-server`. **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
 
 **Dependencies:** `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (both 2.3.1, installed in M2; the client is needed by the protocol tests, and M4 uses it again). The Inspector is run with `npx` and is not installed. `@langchain/mcp-adapters` only if M4's comparison step is done.
 
@@ -324,7 +331,7 @@ For Claude Code the same command is added with `claude mcp add rag-documents -- 
 
 ---
 
-### Phase M3: Resources and prompts ⏭️ *next lesson*
+### Phase M3: Resources and prompts ✅
 
 Learn the other two server features.
 
@@ -340,11 +347,63 @@ Learn the other two server features.
 
 **Design:** fact 3.
 
-**Record:** (empty)
+**Record (done 2026-10-23)**
+
+*What was built.*
+
+| File | What it is |
+|---|---|
+| `resources.ts` | `readDocumentsResource` (the fixed resource `rag://documents`: the list of documents as JSON), `listSectionResources` (the list a host shows: one entry per section of every document) and `readSectionResource` (the text of one section: its passages in document order, separated by an empty line). An unknown section throws |
+| `prompts.ts` | `summarize_section`: one argument (`section`), returns the instruction as a text message and then the section text as an attached resource. An unknown section throws |
+| `retrieval.ts` | One new function, `getSectionChunks(section)`: a Qdrant scroll with a filter on `section`, sorted by `chunkIndex`. (This copy now differs from the LangGraph one.) |
+| `server.ts` | Registers the fixed resource, the template `rag://sections/{section}` and the prompt, next to the three tools |
+
+*Tool, resource, prompt: who uses what.*
+
+| | Tool | Resource | Prompt |
+|---|---|---|---|
+| Who decides to use it | The **model** (with the user's approval) | The **application** or the user: an item to attach or read | The **user**: picked from a menu |
+| Ours | `search_documents`, `get_chunk`, `list_documents` | `rag://documents`, `rag://sections/{section}` | `summarize_section` |
+| What it takes | Arguments checked against a schema | An address (a URI) | Arguments checked against a schema |
+| What comes back | `content` blocks, or `isError: true` | `contents` with the text | `messages` for the model |
+| A failure | A result with `isError: true` (the model can read it) | A protocol error (the host sees it) | A protocol error |
+
+The same information can be offered all three ways: *search for Kafka* is a tool call, *the text of the section Kafka* is a resource, and *summarise the section Kafka* is a prompt that attaches that resource.
+
+*How to see them* (Inspector, `modern` era; add `-q` to hide the status lines):
+
+```bash
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --protocol-era modern --method resources/list
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --protocol-era modern --method resources/templates/list
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --protocol-era modern --method resources/read --uri rag://sections/DBMS
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --protocol-era modern --method prompts/list
+npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src/mcp/server.ts --protocol-era modern --method prompts/get --prompt-name summarize_section --prompt-args section=n8n
+```
+
+*What was checked.*
+
+| Check | Result |
+|---|---|
+| `test:mcp-resources` (12 tests, offline): the fixed resource returns the document list as JSON with the address asked for; one resource per section, named after the section and file (or the document id); the section text in the given order, joined by an empty line; unknown section is an error; the prompt returns the text message and the attached resource, with the name encoded in the address; the argument must be 1 to 60 characters; the text is passed on unchanged; strange characters in a section name are encoded | 12 passed |
+| `test:mcp-server` (13 tests, now with M3): the server declares tools, resources and prompts; the template and the prompt (with its required argument) are listed; a prompt without its argument and a foreign address are refused; with Qdrant up the resource list has the document list and every section, reading `DBMS` returns both of its passages and `Nope` is an error, and the prompt for `n8n` returns two messages | 13 passed |
+| `test:mcp-tools` (M2, 14 tests) | still 14 passed |
+| Inspector, `modern` era: all five commands above, plus an unknown section, an unknown address, a prompt with an unknown section and a prompt without its argument | as in facts 28 to 32 |
+| Inspector, `legacy` era: `prompts/list` | the same prompt |
+| Qdrant unreachable (`-e QDRANT_URL=http://localhost:1`): `resources/list` and `resources/read rag://documents` | both fail with `fetch failed` (fact 34) |
+
+*What surprised me.*
+- **The template needs a list callback to be useful.** Without `list`, a host can read `rag://sections/Kafka` if it knows the address, but cannot show the user what exists. The SDK makes you write `list: undefined` on purpose, so it is never forgotten.
+- **One broken list breaks the whole list.** With Qdrant down, the fixed resource disappears too (fact 34). Tools never did this, because a tool failure is a result. Whether that matters depends on the host.
+- **A prompt can carry data.** The summary prompt does not paste the section text into a string: it attaches it as a resource with its address, so the host can show where it came from.
+- **Resources are not wrapped as untrusted.** The tools wrap their output with the `<tool_result … untrusted>` tag; a resource is data that the user or the host chose to read, so it is returned as it is (a test fixes this). The text still comes from documents, so a **client** should treat it as untrusted (M5).
+- **Names in addresses must be encoded.** A section name with `/`, `?` or `#` would break the address, so `encodeURIComponent` is used and decoded when the template variable is read.
+
+*Not checked.* How a real host presents resources (an attach menu) and prompts (a command menu), and whether it handles the embedded resource in the prompt; completion of the `{section}` variable (the SDK supports it, not used); a resource that changes while the server runs (no change notifications).
+
 
 ---
 
-### Phase M4: Build a client and use MCP tools in an agent
+### Phase M4: Build a client and use MCP tools in an agent ⏭️ *next lesson*
 
 Learn the other side: an app that uses a server's tools.
 
@@ -470,7 +529,7 @@ Items are checked off as phases complete.
 - [x] The message flow of one tool call is written down from a real server, with every field explained. *(M1: the Phase M1 record)*
 - [x] `src/mcp/` imports nothing from outside itself (enforced by `test:mcp-tools`), and the server writes nothing to stdout (enforced by `test:mcp-server`).
 - [x] The three document tools work over stdio: tested offline and through the Inspector in both protocol eras; **a real host was not tried**. *(M2)*
-- [ ] Resources and a prompt are served and read. *(M3)*
+- [x] Resources and a prompt are served and read: tested offline, through the SDK client and through the Inspector. *(M3; a real host was not tried)*
 - [ ] An agent answers a question using tools that come from the server, and the hand-written adapter is compared with `@langchain/mcp-adapters`. *(M4)*
 - [ ] A third-party server is connected behind an allowlist and an approval rule; hostile, hanging and oversized results are tested. *(M5)*
 - [ ] The server also runs over HTTP with a token check, and the cases without a token or with a wrong one are rejected. *(M6)*

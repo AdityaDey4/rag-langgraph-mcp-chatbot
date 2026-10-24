@@ -76,6 +76,22 @@ export async function listDocuments() {
   return [...documents.entries()].map(([documentId, doc]) => ({ documentId, ...doc }));
 }
 
+// Example: getSectionChunks("DBMS") returns the 2 passages of the section DBMS in document order: [ { id: "…", section: "DBMS", pages: [1], … }, { id: "…", section: "DBMS", pages: [2], … } ]
+// An unknown section returns an empty list. (Added in M3; the LangGraph copy does not have it.)
+export async function getSectionChunks(section: string): Promise<Chunk[]> {
+  const page = await getQdrant().scroll(COLLECTION_NAME, {
+    limit: 64,
+    with_payload: true,
+    with_vector: false,
+    filter: { must: [{ key: "section", match: { value: section } }] },
+  });
+
+  // The passages come back in any order, so they are put in the order of the document.
+  const inOrder = [...page.points].sort((a, b) => Number(a.payload?.chunkIndex ?? 0) - Number(b.payload?.chunkIndex ?? 0));
+
+  return inOrder.map((point) => toChunk(point.id, point.payload, null));
+}
+
 // Example: toChunk("fd04…", { filename: "school.pdf", section: "Kafka", pageNumbers: [3], text: "…" }, 0.47) returns { id: "fd04…", filename: "school.pdf", section: "Kafka", pages: [3], text: "…", score: 0.47 }
 function toChunk(id: string | number, payload: Record<string, unknown> | null | undefined, score: number | null): Chunk {
   const data = payload ?? {};

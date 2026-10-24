@@ -1,9 +1,11 @@
-// The MCP server: it offers the three document tools to any MCP client over stdio.
+// The MCP server: it offers the document tools, two kinds of resources and a prompt to any MCP client over stdio.
 //   npm run mcp:server      (a host such as Claude Desktop starts it itself, see docs/MCP-SPEC.md)
 // stdout is only for protocol messages. Everything we print goes to stderr (see log.ts).
-import { McpServer } from "@modelcontextprotocol/server";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { log } from "./log";
+import { summarizeSection, summarizeSectionDescription, summarizeSectionSchema } from "./prompts";
+import { documentsUri, listSectionResources, readDocumentsResource, readSectionResource, sectionUriTemplate } from "./resources";
 import { getChunk, getChunkDescription, getChunkSchema } from "./tools/get-chunk";
 import { listDocuments, listDocumentsDescription, listDocumentsSchema } from "./tools/list-documents";
 import { searchDocuments, searchDocumentsDescription, searchDocumentsSchema } from "./tools/search-documents";
@@ -34,10 +36,32 @@ function createServer() {
     () => listDocuments(),
   );
 
+  // 2. Resources: data the host can read. One fixed resource, and one resource for every section.
+  server.registerResource(
+    "documents",
+    documentsUri,
+    { title: "Documents", description: "The list of documents with their sections.", mimeType: "application/json" },
+    (uri) => readDocumentsResource(uri),
+  );
+
+  server.registerResource(
+    "sections",
+    new ResourceTemplate(sectionUriTemplate, { list: () => listSectionResources() }),
+    { title: "Document sections", description: "The text of one section of the documents." },
+    (uri, variables) => readSectionResource(uri, decodeURIComponent(String(variables.section))),
+  );
+
+  // 3. A prompt: a message the user picks in the host.
+  server.registerPrompt(
+    "summarize_section",
+    { title: "Summarise a section", description: summarizeSectionDescription, argsSchema: summarizeSectionSchema },
+    (args) => summarizeSection(args),
+  );
+
   return server;
 }
 
-// 2. Serve it over stdio. serveStdio talks to clients of both protocol eras (see fact 14 in docs/MCP-SPEC.md).
+// 4. Serve it over stdio. serveStdio talks to clients of both protocol eras (see fact 14 in docs/MCP-SPEC.md).
 serveStdio(createServer, {
   onerror: (error) => log(`error: ${error}`),
 });
