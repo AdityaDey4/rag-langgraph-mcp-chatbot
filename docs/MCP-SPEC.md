@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.4, 2026-10-23. **Phases M1 to M3 are done** (the protocol watched on a ready-made server; our own stdio server with the three document tools; resources and a prompt). Phase M4 (a client, and an agent that uses MCP tools) is next. |
+| **Status** | Draft v0.6, 2026-10-25. **Phases M1 to M4 are done** (the protocol watched on a ready-made server; our own stdio server with tools, resources and a prompt; a client and a small agent whose tools come from the server). Phase M5 (external servers and safety) is next. |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how MCP works** by using each of its core ideas in real code, with every message visible. |
 | **Interface** | A command line, the MCP Inspector, Claude Code or Claude Desktop (as a host), and tests. **No browser UI.** |
@@ -60,7 +60,7 @@ Checked on 2026-10-23 from the official documentation and the npm registry. **"D
 | 8 | **Client API (docs):** `import { Client } from "@modelcontextprotocol/client"` and `import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"`. `new Client({ name, version })`, `await client.connect(transport)`, `await client.listTools()`, `await client.callTool({ name, arguments })`, `await client.close()` | docs | M4 | ✅ in the M2 tests (fact 28) |
 | 9 | **MCP Inspector** (`@modelcontextprotocol/inspector`, 2.12.0): `npx @modelcontextprotocol/inspector --cli node build/index.js --protocol-era modern --method tools/list` lists a server's tools from the command line | docs, npm | M1, M2 | ✅ (fact 20) |
 | 10 | **Claude Desktop** loads servers from `claude_desktop_config.json` (Windows: `%AppData%\Claude\claude_desktop_config.json`) with `{ "mcpServers": { "name": { "command": "node", "args": ["C:\\path\\to\\index.js"] } } }` (the backslashes are doubled because it is JSON). The server must be built first | docs | M2 | ◐ the config for this server is written below; no host was tried |
-| 11 | `@langchain/mcp-adapters` **2.0.1**: Node 20.10 or newer, peers `@langchain/core` ^1.2.6 and `@langchain/langgraph` ^1.4.18 (this project has 1.5.0), and it depends on `@modelcontextprotocol/client` ^2.2.0. `new MultiServerMCPClient({ math: { transport: "stdio", command: "node", args: [path] } })` and `await client.getTools()` give LangChain tools. It is stateless by default: every tool call opens a fresh session and closes it | npm, LangChain docs | M4 | ⬜ |
+| 11 | `@langchain/mcp-adapters` **2.0.1**: Node 20.10 or newer, peers `@langchain/core` ^1.2.6 and `@langchain/langgraph` ^1.4.18 (this project has 1.5.0), and it depends on `@modelcontextprotocol/client` ^2.2.0. `new MultiServerMCPClient({ math: { transport: "stdio", command: "node", args: [path] } })` and `await client.getTools()` give LangChain tools. It is stateless by default: every tool call opens a fresh session and closes it | npm, LangChain docs | M4 | ✅ installed with `--no-save` for the comparison in M4 (fact 40) |
 | 12 | **Security (spec):** hosts must get the user's explicit consent before invoking any tool, and descriptions or annotations of tools must be treated as **untrusted** unless the server is trusted. MCP itself cannot enforce this, so the host must | docs | M5 | ⬜ |
 | 13 | This machine: Node 22.20 (needs 20 or newer), Windows, Qdrant in Docker for the search tools | checked | all | ✅ |
 | 14 | **The reference filesystem server (`@modelcontextprotocol/server-filesystem` 2.0.0) speaks only the older era.** `server/discover` gets `-32601 Method not found`. The Inspector with `--protocol-era modern` fails with "the server did not offer pinned protocol version 2026-07-28 via server/discover (no fallback in pin mode)". With `legacy` or `auto` it works. So not every server speaks the current revision, and a client has to handle both | run in M1 | M2, M4, M5 | ✅ |
@@ -84,8 +84,18 @@ Checked on 2026-10-23 from the official documentation and the npm registry. **"D
 | 32 | **Errors for resources and prompts are protocol errors, not `isError` results.** An unknown section: `No section called "Nope".`; an address that is not a resource: `Resource not found: file:///etc/passwd`; a prompt without its argument: `Invalid arguments for prompt summarize_section: section: Invalid input: expected string, received undefined`. The SDK client rejects with them, and the Inspector shows `{"error": …}`. Only tool calls use `isError` (facts 18 and 25) | run in M3 | M3, M4 | ✅ |
 | 33 | **The capabilities follow the registrations.** After the first `registerTool`, `registerResource` and `registerPrompt`, the client sees `tools`, `resources` and `prompts` in `getServerCapabilities()`; the filesystem server of fact 16 only had `tools` | run in M3 | M3, M4 | ✅ |
 | 34 | **A failing template list breaks the whole `resources/list`.** With Qdrant unreachable, `resources/list` returns an error (`fetch failed`) and even the fixed resource is not listed; `resources/read rag://documents` fails the same way, while a tool call would return an `isError` result. A real server could catch the error in the list callback and return only the fixed resources; this one does not | run in M3 | M3, M5 | ✅ |
+| 35 | **The SDK client works as the documentation says.** `new Client({ name, version })`, `new StdioClientTransport({ command, args })`, `await client.connect(transport)`, `listTools()`, `callTool({ name, arguments })`, `getServerCapabilities()`, `getServerVersion()` and `close()`. `connect()` **throws** for a command that does not exist and for a server that exits at once. A call made **after** `close()` fails with an error, it does not hang. The transport starts `npx` correctly on Windows (it uses `cross-spawn`, so no `shell: true` is needed) | run in M4 | M4, M5 | ✅ |
+| 36 | **The client copes with both protocol eras without any switch.** The same `connectToServer()` connected to the older reference filesystem server (capabilities: `tools` only; server version `secure-filesystem-server`; 14 tools) and to our own server (capabilities: `tools`, `resources`, `prompts`; version `rag-documents`). The adapter even called the filesystem server's `read_text_file` | run in M4 | M4, M5 | ✅ |
+| 37 | **A LangChain `tool()` accepts a JSON schema as its `schema`, and checks the arguments against it before calling.** A call without `query` is refused by the tool itself (`Received tool input did not match expected schema`) and never reaches the server. So a server only sees arguments that pass its own schema | run in M4 | M4, M5 | ✅ |
+| 38 | **`ToolNode` turns a thrown error into an error message for the model** (a `ToolMessage` with `status: "error"`), as in the LangGraph work. The adapter throws when a result has `isError: true`, so a failed MCP call reaches the model as "Error: …" text | run in M4 | M4, M5 | ✅ |
+| 39 | **The whole loop works through the server.** `npm run mcp:agent`: "What is Kafka? Answer in one sentence." → one `search_documents` call → an answer with the chunk id cited; 2 model calls, 1 tool call, 2765 tokens in, 65 out. The agent file has no tool definitions of its own | run in M4 | M4, M6 | ✅ |
+| 40 | **`@langchain/mcp-adapters` 2.0.1** (installed with `--no-save` for a comparison): `new MultiServerMCPClient({ docs: { transport: "stdio", command, args } })` and `await client.getTools()`. **Names are prefixed with the server name** (`docs_search_documents`, `docs_get_chunk`, …). It **keeps `$schema`** in the schema. A failed call throws with more context (`MCP tool 'get_chunk' on server 'docs' returned an error: Error: fetch failed`). A successful call returns the same text as our adapter, and the `ToolMessage` also gets an `artifact` with the server's `_meta` (`[{ type: "mcp_meta", data: { "io.modelcontextprotocol/serverInfo": … } }]`). **It must be closed** (`close()`): a first script that failed before closing it hung, with the server process left running | run in M4 | M4, M5 | ✅ |
+| 41 | **With Qdrant down the agent failed safely but kept trying.** Every `search_documents` call came back as an error result; the model tried 3 times with new wordings, then apologised (4 model calls, 3 tool calls). Nothing in this agent stops repeated calls to a dead server; the step limit is the only guard | run in M4 | M5 | ✅ |
+| 42 | **A real host used the server.** After the config for `rag-documents` was added in Claude Desktop (Settings → Developer → Edit Config, the Store install), the Claude app's **Code tab** also loaded it: the **+ → Connectors** menu lists `rag-documents` with an on/off toggle, and the model of that session was handed the three tools. It called `list_documents` (6 sections, 9 passages) and `search_documents("What is Kafka?")` (the Kafka passage, score 0.696, chunk id `fd04038f-…`) and got the results of fact 22. No code changed for this: only the command in the config | run in M4 | M2 to M4 | ✅ |
+| 43 | **The model only gets the tools.** In that session the model was handed `list_documents`, `search_documents` and `get_chunk`, not the resources or the prompt. A person reaches those through the host (attach menu or `@` for resources, slash commands for prompts); how the Code tab and the Desktop chat show them was **not seen** (a screenshot of the Code tab's **+** menu had no resources or prompts entry; the Connectors toggle only switches the server on or off) | run in M4 | M3 | ◐ |
+| 44 | **What a host does with a resource and a prompt, done by hand** (`npm run mcp:host`): `listResources()` gives 7 addresses (the document list and one per section) and `listPrompts()` gives `summarize_section` with the argument `section`. `readResource("rag://sections/Kafka")` returned 1,624 characters, and given to the model with "Explain this in two sentences." it answered with two sentences and **no search tool**. `getPrompt("summarize_section", { section: "n8n" })` returned two messages (the instruction as text, and the n8n text, 1,549 characters, as an attached resource); given to the model they produced exactly three bullet points about n8n | run in M4 | M3 | ✅ |
 
-**Not known yet** (to be found by running it): how a client copes with servers of both eras (M4), whether `@langchain/mcp-adapters` works with this project's LangGraph graph (M4), how a Streamable HTTP server is started with the v2 package and what the authentication helpers look like (M6), and how a real host (Claude Code or Claude Desktop) shows the server (not tried). (How the filesystem server is started is now known: fact 20.)
+**Not known yet** (to be found by running it): how a Streamable HTTP server is started with the v2 package and what the authentication helpers look like (M6), and how a real host (Claude Code or Claude Desktop) shows the server (not tried). (How the filesystem server is started is now known: fact 20.)
 
 ---
 
@@ -172,9 +182,11 @@ src/mcp/
   server.ts           stdio entry point                                                               (M2, exists)
   resources.ts        the document list and the sections as resources                                (M3, exists)
   prompts.ts          the summarize_section prompt                                                   (M3, exists)
-  client.ts           connect, list tools, call a tool                  (M4)
-  adapter.ts          MCP tool → LangChain tool                         (M4)
-  agent.ts            the small graph with MCP tools                    (M4)
+  client.ts           connect to a server started as a subprocess                                     (M4, exists)
+  adapter.ts          MCP tool → LangChain tool, written by hand                                      (M4, exists)
+  agent.ts            the small graph (llm → tools → llm) with MCP tools                              (M4, exists)
+  agent-index.ts      npm run mcp:agent -- "question"                                                 (M4, exists)
+  host-demo.ts        npm run mcp:host: list, read and run resources and a prompt, like a host does   (exists)
   safety.ts           allowlist, approval list, limits, output check    (M5)
   http-server.ts      Streamable HTTP entry point                       (M6)
   m1-wire-trace.ts    M1: raw messages to a ready-made server, printed (learning script, exists)
@@ -182,9 +194,9 @@ src/mcp/
 docs/MCP-SPEC.md      this file
 ```
 
-**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `test:mcp-tools`, `test:mcp-resources`, `test:mcp-server`. **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
+**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `mcp:agent` (ask the MCP agent), `mcp:host` (use a resource and a prompt like a host does), `test:mcp-tools`, `test:mcp-resources`, `test:mcp-server`, `test:mcp-adapter`, `test:mcp-client`, `test:mcp-agent`. **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
 
-**Dependencies:** `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (both 2.3.1, installed in M2; the client is needed by the protocol tests, and M4 uses it again). The Inspector is run with `npx` and is not installed. `@langchain/mcp-adapters` only if M4's comparison step is done.
+**Dependencies:** `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (both 2.3.1, installed in M2; the client is needed by the protocol tests, and M4 uses it again). The Inspector is run with `npx` and is not installed. `@langchain/mcp-adapters` was tried with `--no-save` in M4 and is **not** a dependency.
 
 ---
 
@@ -326,7 +338,7 @@ For Claude Code the same command is added with `claude mcp add rag-documents -- 
 - **Errors need no special code.** The SDK turns a thrown error or a bad argument into an `isError` result by itself, but a returned `isError` result lets us write a clear message, so the tools catch and return.
 - **Plain functions, not tool objects.** Keeping each tool as a plain function with a description and a schema made the server file read like a catalog, and made the tests simple.
 
-*Not checked.* A real host (Claude Code or Claude Desktop) using the server; the config above is untested. The learning script `m1-wire-trace.ts` was left in the folder (it only runs the filesystem server).
+*Not checked.* How the Claude Desktop chat shows the server's resources and prompt (the config above was added and the **tools** were used from the Code tab, fact 42). The learning script `m1-wire-trace.ts` was left in the folder (it only runs the filesystem server).
 
 
 ---
@@ -403,7 +415,7 @@ npx @modelcontextprotocol/inspector --cli node node_modules/tsx/dist/cli.mjs src
 
 ---
 
-### Phase M4: Build a client and use MCP tools in an agent ⏭️ *next lesson*
+### Phase M4: Build a client and use MCP tools in an agent ✅
 
 Learn the other side: an app that uses a server's tools.
 
@@ -420,11 +432,60 @@ Learn the other side: an app that uses a server's tools.
 
 **Design:** sections 3 and 4, facts 6, 8, 11.
 
-**Record:** (empty)
+**Record (done 2026-10-24)**
+
+*What was built.*
+
+| File | What it is |
+|---|---|
+| `client.ts` | `connectToServer(server)`: starts a server from a command and its arguments (`ServerCommand`, like a host config) and connects with the SDK client. The default is `ownServer`, our `server.ts` run by the project's own `tsx` with absolute paths |
+| `adapter.ts` | `loadTools(client)`: one LangChain tool for every tool the server lists. The tool passes the name and the arguments to `client.callTool`, returns the text of the result, and **throws** when the result has `isError: true`. `textOf(result)` joins the text blocks (other blocks are only named). It takes anything with `listTools` and `callTool`, so tests use a fake client |
+| `agent.ts` | `createMcpAgent(server)`: connects, loads the tools, binds them to the model, and builds the graph `llm → tools → llm` with the ready-made `ToolNode`. Returns `{ toolNames, ask, close }`. `ask(question)` returns the answer, the tool calls (with failures), the model calls and the tokens. No memory, approval or streaming |
+| `agent-index.ts` | `npm run mcp:agent -- "question"`: starts the server, asks, prints the tool calls and the answer, and stops the server |
+| `prompt.ts`, `config.ts` | The system prompt (copied from the LangGraph one, **without the lines about `calculate`, `get_current_datetime` and `send_email`**, because this server has only three tools) and `CHAT_MODEL` |
+
+*How the agent is different from the LangGraph agent.* The tools are not in its code. The model node, the router and the loop are the same idea as Phase 1 to 3, in 107 lines, against 360 for the LangGraph agent (which also has memory, approval, streaming and limits). A call goes: model asks → `ToolNode` → the tool made by the adapter → `client.callTool` → stdio → our server → Qdrant, and the result goes back the same way.
+
+*Hand-written adapter against `@langchain/mcp-adapters` 2.0.1* (fact 40; the library was tried and not kept):
+
+| | Our `adapter.ts` | The library |
+|---|---|---|
+| Size | 59 lines | a dependency (it uses the same MCP client packages) |
+| Tool names | As the server gives them | **Prefixed with the server name** (`docs_search_documents`) |
+| Schema | Without `$schema` | With `$schema` |
+| A failed call | Throws the server's text | Throws with context: the tool, the server and the text |
+| A successful call | The text | The same text, plus an `artifact` with the server's `_meta` on the `ToolMessage` |
+| Several servers | **Not handled**: two servers with the same tool name would clash | Handled by the prefix, and by one `MultiServerMCPClient` for all |
+| Closing | `client.close()` | `close()`, and a script that fails before it hangs |
+
+*Decision.* Our adapter stays for now (smaller, and it shows how an MCP tool becomes a LangChain tool). **M5 needs more than one server, so the name clash must be solved there:** either a prefix in our adapter (a few lines) or the library. The prefix of the library is the useful idea.
+
+*What was checked.*
+
+| Check | Result |
+|---|---|
+| `test:mcp-adapter` (9 tests, a fake client): one tool per listed tool with its name and description; a missing description gives an empty one; the schema is passed on without `$schema`; a call sends the name and the arguments and returns the text; `isError` is thrown with the server's message; an unreachable server makes the call fail; several text blocks are joined; a block that is not text is only named; a result with no content gives an empty text | 9 passed |
+| `test:mcp-client` (6 tests, our real server as a subprocess): tools are listed and made; a missing argument is refused by the tool before the server; an unknown chunk id is thrown with the server's message (`Error: …`); a command that does not exist throws; a server that exits at once throws; a call after `close()` fails and does not hang | 6 passed |
+| `test:mcp-agent` (5 scenarios, real model and Qdrant): the three tools are found; "What is Kafka?" searches through the server and cites a passage (4.5 s); a greeting uses no tool (1.4 s); "Which documents do you have?" uses `list_documents` (2.9 s); the unknown chunk id question is recovered from (5.3 s) | 5 passed |
+| `npm run mcp:agent` | one search, an answer with a citation, 2 model calls, 2765 tokens in (fact 39) |
+| The client against the older filesystem server and against ours | both worked (fact 36) |
+| `test:mcp-tools` (14), `test:mcp-resources` (12), `test:mcp-server` (13 with Qdrant) | still passing |
+
+*What surprised me.*
+- **The client needed no era handling.** The SDK picks the protocol version itself, so the same code talks to an old and a new server.
+- **LangChain checks the arguments before the server does.** With a JSON schema in `tool()`, bad arguments are refused on the client, so the server's own checking is a second line of defence.
+- **The loop is the same loop.** Once the tools were LangChain tools, nothing in the graph knew that they were remote: `bindTools` and `ToolNode` worked as before. The cost of "remote" is the subprocess that has to be started (its start time was not measured), not the code.
+- **A dead server is not stopped by anything but the step limit** (fact 41). That is the first thing M5 has to deal with, with a limit on repeated failures.
+- **The prompt had to change.** The LangGraph prompt tells the model to use `calculate` and the date tool; with only three tools the model would try to call tools that do not exist. A shared prompt would be wrong for both, so each folder has its own.
+
+*Not checked.* A host (Claude Desktop or Claude Code) as the client; the library's `MultiServerMCPClient` inside the agent graph (only its tools were compared, not a full run); more than one server at a time (M5); a server that dies in the middle of a run.
+
+*Open question for M6.* The evaluation questions include arithmetic and date questions that need `calculate` and `get_current_datetime`, which this server does not have. Either the server gets those two tools (a small addition), or those categories are left out when comparing the MCP agent with the LangGraph agent.
+
 
 ---
 
-### Phase M5: External servers and safety
+### Phase M5: External servers and safety ⏭️ *next lesson*
 
 Learn what changes when the tools are not yours.
 
@@ -498,12 +559,13 @@ The same rules as in the LangGraph evaluation: the same questions, the same judg
 ### Open decisions (proposed answers, to be confirmed before the phase that needs them)
 
 1. ~~Which SDK.~~ **Decided in M2: the v2 packages** (`@modelcontextprotocol/server` and `/client`, 2.3.1), as in the current documentation. The old `@modelcontextprotocol/sdk` (1.x) is not used.
-2. **Adapter:** write `adapter.ts` by hand first, then try `@langchain/mcp-adapters` and compare. *Proposed. Decided in M4.*
+2. ~~Adapter.~~ **Decided in M4: our own `adapter.ts` stays for now**; the library was compared and not kept. M5 must solve tool-name clashes between servers (a prefix, as the library does).
 3. ~~Host for the real test in M2.~~ **The Inspector was used.** A real host (Claude Code or Claude Desktop) is still open: the config is written and untested.
 4. **Third-party server in M5:** the reference filesystem server on a sample folder. *To be confirmed in M5.* (M1 showed it works in the older era only, which is fine for M5 as long as the client handles both.)
 5. **Authentication in M6:** a static bearer token is built; OAuth is only described. *Proposed.*
 6. **Where the HTTP server runs in M6:** a separate Node process, not a Next.js route. *Proposed.*
-7. **Whether `src/mcp/agent.ts` keeps approval, memory and streaming:** no; only the small loop, plus approval in M5. *Proposed.*
+7. ~~Whether `src/mcp/agent.ts` keeps approval, memory and streaming.~~ **Decided in M4: no**; only the small loop (plus approval in M5).
+8. **Parity for the evaluation (M6):** add `calculate` and `get_current_datetime` to the server, or leave the arithmetic and date questions out of the comparison. *Open.*
 
 ---
 
@@ -530,7 +592,7 @@ Items are checked off as phases complete.
 - [x] `src/mcp/` imports nothing from outside itself (enforced by `test:mcp-tools`), and the server writes nothing to stdout (enforced by `test:mcp-server`).
 - [x] The three document tools work over stdio: tested offline and through the Inspector in both protocol eras; **a real host was not tried**. *(M2)*
 - [x] Resources and a prompt are served and read: tested offline, through the SDK client and through the Inspector. *(M3; a real host was not tried)*
-- [ ] An agent answers a question using tools that come from the server, and the hand-written adapter is compared with `@langchain/mcp-adapters`. *(M4)*
+- [x] An agent answers a question using tools that come from the server, and the hand-written adapter is compared with `@langchain/mcp-adapters`. *(M4: `test:mcp-agent`, and the comparison table in the M4 record)*
 - [ ] A third-party server is connected behind an allowlist and an approval rule; hostile, hanging and oversized results are tested. *(M5)*
 - [ ] The server also runs over HTTP with a token check, and the cases without a token or with a wrong one are rejected. *(M6)*
 - [ ] The evaluation ran with `--mcp` next to `--langgraph`, and the results and what MCP did and did not change are written here. *(M6)*

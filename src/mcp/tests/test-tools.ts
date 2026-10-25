@@ -38,6 +38,7 @@ function textOf(result: { content: { type: "text"; text: string }[] }): string {
 
 // Example: runs every test, then prints "14 passed, 0 failed"
 async function main() {
+  process.env.MCP_LOG = "off"; // no log lines in the test output
   console.log("this folder stands alone");
 
   await test("no file in src/mcp imports anything from outside src/mcp", () => {

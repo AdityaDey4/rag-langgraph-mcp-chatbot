@@ -1,0 +1,122 @@
+// A small agent whose tools come from an MCP server, not from its own code:
+//   START → llm ─(asks for a tool)→ tools → llm … → END
+// It has no memory, no approval and no streaming: only the loop (the LangGraph work has the rest).
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
+import { END, GraphRecursionError, MessagesAnnotation, START, StateGraph } from "@langchain/langgraph";
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+import { ChatOpenAI } from "@langchain/openai";
+import { loadTools } from "./adapter";
+import { connectToServer, ownServer, type ServerCommand } from "./client";
+import { CHAT_MODEL } from "./config";
+import { log } from "./log";
+import { SYSTEM_PROMPT } from "./prompt";
+
+export type ToolCallRecord = {
+  name: string;
+  args: unknown;
+  isError: boolean;
+};
+
+export type AgentRun = {
+  answer: string;
+  toolCalls: ToolCallRecord[];
+  modelCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+};
+
+// Example: createMcpAgent() starts our server, reads its tools and returns { toolNames: ["search_documents", …], ask, close }
+export async function createMcpAgent(server: ServerCommand = ownServer) {
+  // 1. Start the server and ask it for its tools.
+  const client = await connectToServer(server);
+  const tools = await loadTools(client);
+
+  // 2. The model is told about the tools (it only asks for them; it never runs them).
+  const model = new ChatOpenAI({ model: CHAT_MODEL, temperature: 0, maxRetries: 2 }).bindTools(tools);
+
+  // 3. The model node: send the conversation, get an answer or a request for tools.
+  async function callModel(state: typeof MessagesAnnotation.State) {
+    const kinds = ["system", ...state.messages.map((message) => message.getType())].join(", ");
+    log("agent", `model: sending ${state.messages.length + 1} messages (${kinds})`);
+
+    const response = await model.invoke([new SystemMessage(SYSTEM_PROMPT), ...state.messages]);
+
+    if (response.tool_calls?.length) {
+      const asked = response.tool_calls.map((call) => `${call.name} ${JSON.stringify(call.args)}`).join(" | ");
+      log("agent", `model replied: it asks for a tool -> ${asked}`);
+    } else {
+      log("agent", `model replied: a final answer (${String(response.content).length} characters)`);
+    }
+
+    return { messages: [response] };
+  }
+
+  // 4. The router: tools if the model asked for a tool, otherwise the end.
+  function shouldContinue(state: typeof MessagesAnnotation.State) {
+    const lastMessage = state.messages.at(-1);
+
+    if (lastMessage instanceof AIMessage && lastMessage.tool_calls?.length) {
+      log("agent", "router: the model asked for a tool -> tools node (ToolNode runs the tool)");
+      return "tools";
+    }
+
+    log("agent", "router: no tool requested -> end");
+    return END;
+  }
+
+  // 5. The graph. ToolNode runs each requested tool (the adapter sends the call to the server) and turns a failure into an error message.
+  const graph = new StateGraph(MessagesAnnotation)
+    .addNode("llm", callModel)
+    .addNode("tools", new ToolNode(tools))
+    .addEdge(START, "llm")
+    .addConditionalEdges("llm", shouldContinue, { tools: "tools", [END]: END })
+    .addEdge("tools", "llm")
+    .compile();
+
+  // 6. Ask one question.
+  // Example: ask("What is Kafka?") returns { answer: "Apache Kafka is …", toolCalls: [{ name: "search_documents", args: { query: "Kafka" }, isError: false }], modelCalls: 2, inputTokens: 3500, outputTokens: 60 }
+  async function ask(question: string, recursionLimit = 15): Promise<AgentRun> {
+    try {
+      log("agent", `question: ${question}`);
+      const result = await graph.invoke({ messages: [new HumanMessage(question)] }, { recursionLimit });
+
+      const modelMessages = result.messages.filter((message): message is AIMessage => message instanceof AIMessage);
+      const toolMessages = result.messages.filter((message): message is ToolMessage => message instanceof ToolMessage);
+
+      const toolCalls: ToolCallRecord[] = [];
+      for (const message of modelMessages) {
+        for (const call of message.tool_calls ?? []) {
+          const reply = toolMessages.find((toolMessage) => toolMessage.tool_call_id === call.id);
+          toolCalls.push({ name: call.name, args: call.args, isError: reply?.status === "error" });
+        }
+      }
+
+      return {
+        answer: String(modelMessages.at(-1)?.content ?? ""),
+        toolCalls,
+        modelCalls: modelMessages.length,
+        inputTokens: modelMessages.reduce((sum, message) => sum + (message.usage_metadata?.input_tokens ?? 0), 0),
+        outputTokens: modelMessages.reduce((sum, message) => sum + (message.usage_metadata?.output_tokens ?? 0), 0),
+      };
+    } catch (error) {
+      // The loop ran more steps than the limit allows, so LangGraph stopped it.
+      if (error instanceof GraphRecursionError) {
+        return {
+          answer: `I stopped because the step limit (${recursionLimit}) was reached before I could finish.`,
+          toolCalls: [],
+          modelCalls: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+        };
+      }
+      throw error;
+    }
+  }
+
+  // 7. Stop the server (closing the client ends its process).
+  async function close() {
+    await client.close();
+  }
+
+  return { toolNames: tools.map((tool) => tool.name), ask, close };
+}

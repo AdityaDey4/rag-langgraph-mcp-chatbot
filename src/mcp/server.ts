@@ -63,7 +63,7 @@ function createServer() {
 
 // 4. Serve it over stdio. serveStdio talks to clients of both protocol eras (see fact 14 in docs/MCP-SPEC.md).
 serveStdio(createServer, {
-  onerror: (error) => log(`error: ${error}`),
+  onerror: (error) => log("server", `error: ${error}`),
 });
 
-log("rag-documents server running on stdio");
+log("server", "rag-documents server running on stdio");

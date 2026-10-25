@@ -9,3 +9,4 @@ dotenv.config({ path: path.join(__dirname, "..", "..", ".env"), quiet: true });
 
 export const COLLECTION_NAME = "rag_documents"; // the Qdrant collection holding the documents
 export const EMBEDDING_MODEL = "text-embedding-3-large"; // must match how the documents were embedded
+export const CHAT_MODEL = process.env.AGENT_MODEL || "gpt-4o-mini"; // the model of the MCP agent

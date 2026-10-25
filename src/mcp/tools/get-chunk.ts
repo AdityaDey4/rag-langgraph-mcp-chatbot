@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { log } from "../log";
 import { wrapToolResult } from "../prompt";
 import { getChunkById, type Chunk } from "../retrieval";
 
@@ -17,10 +18,13 @@ export async function getChunk(
   { chunkId }: z.infer<typeof getChunkSchema>,
   fetchChunk: (id: string) => Promise<Chunk | null> = getChunkById,
 ) {
+  log("server", `← tools/call get_chunk ${JSON.stringify({ chunkId })}`);
+
   try {
     const chunk = await fetchChunk(chunkId);
 
     if (!chunk) {
+      log("server", "→ error result: no passage with that id");
       return { content: [{ type: "text" as const, text: `Error: No passage found with chunkId "${chunkId}".` }], isError: true };
     }
 
@@ -32,9 +36,12 @@ export async function getChunk(
       text: chunk.text,
     };
 
-    return { content: [{ type: "text" as const, text: wrapToolResult("get_chunk", JSON.stringify(details, null, 2)) }] };
+    const text = wrapToolResult("get_chunk", JSON.stringify(details, null, 2));
+    log("server", `→ result: ${text.length} characters (the passage of "${chunk.section}")`);
+    return { content: [{ type: "text" as const, text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    log("server", `→ error result: ${message}`);
     return { content: [{ type: "text" as const, text: `Error: ${message}` }], isError: true };
   }
 }

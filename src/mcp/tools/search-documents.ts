@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { log } from "../log";
 import { wrapToolResult } from "../prompt";
 import { searchChunks, type Chunk } from "../retrieval";
 
@@ -23,12 +24,20 @@ export async function searchDocuments(
   { query, topK }: z.infer<typeof searchDocumentsSchema>,
   search: (query: string, limit: number) => Promise<Chunk[]> = searchChunks,
 ) {
+  log("server", `← tools/call search_documents ${JSON.stringify({ query, topK })}`);
+
   try {
+    // Embed the query and search Qdrant.
+    log("server", `  searching Qdrant for "${query}" (top ${topK ?? 4})`);
     const chunks = await search(query, topK ?? 4);
 
     if (chunks.length === 0) {
+      log("server", "  found no passages");
       return { content: [{ type: "text" as const, text: wrapToolResult("search_documents", "No passages found.") }] };
     }
+
+    const best = chunks[0];
+    log("server", `  found ${chunks.length} passages, the best is "${best.section}" (score ${best.score?.toFixed(3)})`);
 
     const results = chunks.map((chunk) => ({
       chunkId: chunk.id,
@@ -39,9 +48,12 @@ export async function searchDocuments(
       snippet: chunk.text.length > SNIPPET_LENGTH ? chunk.text.slice(0, SNIPPET_LENGTH) + "…" : chunk.text,
     }));
 
-    return { content: [{ type: "text" as const, text: wrapToolResult("search_documents", JSON.stringify(results, null, 2)) }] };
+    const text = wrapToolResult("search_documents", JSON.stringify(results, null, 2));
+    log("server", `→ result: ${text.length} characters`);
+    return { content: [{ type: "text" as const, text }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    log("server", `→ error result: ${message}`);
     return { content: [{ type: "text" as const, text: `Error: ${message}` }], isError: true };
   }
 }

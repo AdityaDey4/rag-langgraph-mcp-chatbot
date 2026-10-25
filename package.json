@@ -31,8 +31,13 @@
     "langgraph-report": "tsx src/langgraph/report-index.ts",
     "mcp:m1-trace": "tsx src/mcp/m1-wire-trace.ts",
     "mcp:server": "tsx src/mcp/server.ts",
+    "mcp:agent": "tsx src/mcp/agent-index.ts",
+    "mcp:host": "tsx src/mcp/host-demo.ts",
     "test:mcp-tools": "tsx src/mcp/tests/test-tools.ts",
     "test:mcp-server": "tsx src/mcp/tests/test-server.ts",
+    "test:mcp-adapter": "tsx src/mcp/tests/test-adapter.ts",
+    "test:mcp-client": "tsx src/mcp/tests/test-client.ts",
+    "test:mcp-agent": "tsx src/mcp/tests/test-agent.ts",
     "test:mcp-resources": "tsx src/mcp/tests/test-resources.ts"
   },
   "dependencies": {
