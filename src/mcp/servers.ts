@@ -1,9 +1,9 @@
 // The servers the agent connects to, with the rules for each one (the rules are applied by safety.ts).
-import { ownServer, type ServerCommand } from "./client";
+import { ownServer, type ServerTarget } from "./client";
 import type { ServerPolicy } from "./safety";
 
 export type ServerConfig = {
-  server: ServerCommand; // how to start it
+  server: ServerTarget; // how to start it (a command) or where it runs (an address)
   policy: ServerPolicy; // what the agent may do with it
   hint?: string; // one sentence for the model about when to use its tools
 };
@@ -20,6 +20,12 @@ export const documentsServer: ServerConfig = {
     maxOutputChars: 12_000,
   },
 };
+
+// The same server, but reached over HTTP: it is already running (npm run mcp:http) and asks for a token.
+// Example: documentsHttpServer("http://127.0.0.1:3333/mcp", "…") offers the same three tools as documentsServer
+export function documentsHttpServer(url: string, token: string): ServerConfig {
+  return { ...documentsServer, server: { url, token } };
+}
 
 // 2. A server that somebody else wrote: the reference filesystem server, limited to ONE folder.
 // Example: filesServer("C:/shared") offers files_read_text_file, files_list_directory, files_search_files and files_write_file

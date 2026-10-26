@@ -99,13 +99,19 @@ export async function createMcpAgent(servers: ServerConfig[] = [documentsServer]
 
   // 6. Ask one question.
   // Example: ask("What is Kafka?") returns { answer: "Apache Kafka is …", toolCalls: [{ name: "search_documents", args: { query: "Kafka" }, isError: false }], modelCalls: 2, inputTokens: 3500, outputTokens: 60 }
-  async function ask(question: string, recursionLimit = 15): Promise<AgentRun> {
+  // `history` is what was said before (the agent has no memory of its own): [{ role: "user", content: "What is Redis used for?" }, { role: "assistant", content: "…" }]
+  async function ask(question: string, history: { role: "user" | "assistant"; content: string }[] = [], recursionLimit = 15): Promise<AgentRun> {
     try {
       log("agent", `question: ${question}`);
-      const result = await graph.invoke({ messages: [new HumanMessage(question)] }, { recursionLimit });
+      const earlier = history.map((message) => (message.role === "user" ? new HumanMessage(message.content) : new AIMessage(message.content)));
+      const result = await graph.invoke({ messages: [...earlier, new HumanMessage(question)] }, { recursionLimit });
 
-      const modelMessages = result.messages.filter((message): message is AIMessage => message instanceof AIMessage);
-      const toolMessages = result.messages.filter((message): message is ToolMessage => message instanceof ToolMessage);
+      // Only the messages of this question (not the history).
+      const lastQuestion = result.messages.findLastIndex((message) => message instanceof HumanMessage);
+      const thisRun = result.messages.slice(lastQuestion + 1);
+
+      const modelMessages = thisRun.filter((message): message is AIMessage => message instanceof AIMessage);
+      const toolMessages = thisRun.filter((message): message is ToolMessage => message instanceof ToolMessage);
 
       const toolCalls: ToolCallRecord[] = [];
       for (const message of modelMessages) {

@@ -1,18 +1,28 @@
 // Ask the MCP agent a question from the terminal:
 //   npm run mcp:agent -- "What is Kafka?"
 //   npm run mcp:agent -- --files C:/shared "What is in notes.txt? Then save a file called todo.txt that says: buy milk"
+//   npm run mcp:agent -- --url http://127.0.0.1:3333/mcp "What is Kafka?"     (our server over HTTP: start it first with npm run mcp:http)
 // It starts our MCP server (and, with --files, the reference filesystem server limited to that folder) as subprocesses.
 // A tool that needs approval (writing a file) asks you here first.
 import { createInterface } from "node:readline/promises";
+import "./config"; // loads .env (the token for --url)
 import { createMcpAgent } from "./agent";
 import type { Approve } from "./safety";
-import { documentsServer, filesServer } from "./servers";
+import { documentsHttpServer, documentsServer, filesServer } from "./servers";
 
-// 1. The arguments: an optional --files <folder>, then the question.
+// 1. The arguments: an optional --files <folder>, an optional --url <address>, then the question.
 const args = process.argv.slice(2);
-const filesFlag = args.indexOf("--files");
-const folder = filesFlag >= 0 ? args[filesFlag + 1] : undefined;
-const question = args.filter((_, index) => filesFlag < 0 || (index !== filesFlag && index !== filesFlag + 1)).join(" ") || "What is Kafka? Answer in one sentence.";
+
+// Example: valueOf("--files") returns "C:/shared" for the arguments ["--files", "C:/shared", "What is Kafka?"], and undefined when the flag is missing
+function valueOf(flag: string) {
+  const position = args.indexOf(flag);
+  return position >= 0 ? args[position + 1] : undefined;
+}
+
+const folder = valueOf("--files");
+const url = valueOf("--url");
+const words = args.filter((word, index) => !["--files", "--url"].includes(word) && !["--files", "--url"].includes(args[index - 1]));
+const question = words.join(" ") || "What is Kafka? Answer in one sentence.";
 
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
 
@@ -26,7 +36,9 @@ const askAPerson: Approve = async ({ server, tool, args }) => {
 };
 
 async function main() {
-  const servers = folder ? [documentsServer, filesServer(folder)] : [documentsServer];
+  // Our documents server: over HTTP when an address is given (it needs the token from .env), otherwise started as a subprocess.
+  const documents = url ? documentsHttpServer(url, process.env.MCP_HTTP_TOKEN ?? "") : documentsServer;
+  const servers = folder ? [documents, filesServer(folder)] : [documents];
   const agent = await createMcpAgent(servers, askAPerson);
 
   try {

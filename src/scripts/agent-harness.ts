@@ -13,6 +13,10 @@ import { getOpenAI } from "../lib/clients";
 import { CHAT_MODEL } from "../lib/config";
 import { addMessage } from "../lib/conversation-memory";
 import { runForEvaluation } from "../langgraph/summary";
+import { createMcpAgent } from "../mcp/agent";
+import { startHttpServer } from "../mcp/http-server";
+import { documentsHttpServer } from "../mcp/servers";
+import { runMcpForEvaluation } from "../mcp/summary";
 
 const EMBEDDING_PRICE_PER_M = 0.13; // text-embedding-3-large, approximate
 
@@ -68,7 +72,7 @@ function resetMeter() {
 export type ToolCallRecord = { name: string; args: unknown; isError: boolean };
 
 export type RunSummary = {
-  path: "agent" | "classic" | "langgraph";
+  path: "agent" | "classic" | "langgraph" | "mcp" | "mcp-http";
   question: string;
   answer: string;
   toolCalls: ToolCallRecord[];
@@ -236,6 +240,54 @@ export async function runLangGraphOnce(
     citations: run.citations,
     error: run.error,
   };
+}
+
+// The MCP agent (src/mcp). Starting it takes a few seconds (our server is started as a subprocess, or the HTTP server is started here),
+// so it is started once, on the first question, and used for all the others. closeMcp() stops it.
+type McpTransport = "stdio" | "http";
+const mcpAgents: Partial<Record<McpTransport, ReturnType<typeof startMcpAgent>>> = {};
+const httpServers: Awaited<ReturnType<typeof startHttpServer>>[] = [];
+
+async function startMcpAgent(transport: McpTransport) {
+  if (transport === "stdio") return createMcpAgent();
+
+  // Over HTTP: our server is started in this process on a free port, with a token made for this run.
+  const token = randomUUID() + randomUUID();
+  const server = await startHttpServer({ port: 0, token });
+  httpServers.push(server);
+
+  return createMcpAgent([documentsHttpServer(server.url, token)]);
+}
+
+export async function runMcpOnce(
+  question: string,
+  history: Array<{ role: "user" | "assistant"; content: string }> = [],
+  transport: McpTransport = "stdio"
+): Promise<RunSummary> {
+  const agent = await (mcpAgents[transport] ??= startMcpAgent(transport));
+  const run = await runMcpForEvaluation(agent, question, history);
+
+  return {
+    path: transport === "stdio" ? "mcp" : "mcp-http",
+    question,
+    answer: run.answer,
+    toolCalls: run.toolCalls,
+    steps: run.modelCalls, // the other agents also count model calls as steps
+    chatCalls: run.modelCalls,
+    inputTokens: run.inputTokens,
+    outputTokens: run.outputTokens,
+    embeddingTokens: 0, // not measured here either
+    costUsd: run.costUsd,
+    latencyMs: run.latencyMs,
+    stoppedBy: run.stoppedBy,
+    citations: run.citations,
+    error: run.error,
+  };
+}
+
+export async function closeMcp() {
+  for (const started of Object.values(mcpAgents)) await (await started).close();
+  for (const server of httpServers) await server.close();
 }
 
 export type Verdict = { pass: boolean; reason: string };

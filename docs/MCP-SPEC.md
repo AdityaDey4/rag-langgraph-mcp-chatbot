@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft v0.7, 2026-10-25. **Phases M1 to M5 are done** (the protocol watched on a ready-made server; our own stdio server with tools, resources and a prompt; a client and a small agent whose tools come from the server). Phase M6 (a remote server over HTTP, and the evaluation) is next. |
+| **Status** | Draft v0.8, 2026-10-26. **All six phases (M1 to M6) are done** (the protocol watched on a ready-made server; our own stdio server with tools, resources and a prompt; a client and a small agent whose tools come from the server). The MCP evaluation (section 8) has been run. |
 | **Owner** | Aditya Dey |
 | **Primary goal** | **Understand how MCP works** by using each of its core ideas in real code, with every message visible. |
 | **Interface** | A command line, the MCP Inspector, Claude Code or Claude Desktop (as a host), and tests. **No browser UI.** |
@@ -103,6 +103,13 @@ Checked on 2026-10-23 from the official documentation and the npm registry. **"D
 | 51 | **Time limit and failed-server guard.** With a 1 s limit, a tool that never answers returned an error the model can read in under 4 s; with 3 such failures in a row, the 4th call was not even made (`… is not answering`). The call itself is not cancelled: the agent only stops waiting, and closing the client ends the server's process. A result the server reports as an error (`isError`) is not counted as a broken server | run in M5 | M5 | ✅ |
 | 52 | **Output and description limits.** A result of 2,000,000 characters was cut to under 5,500 with the limit at 5,000; a hostile description (a `<system>` tag, about 1,750 characters) was cut to 400 characters with its tags removed; a result with `</tool_result>` inside could not close the wrapper | run in M5 | M5 | ✅ |
 | 53 | **A failing approval counts as "no".** If asking the person throws (no terminal, input closed), the tool is not run | run in M5 | M5 | ✅ |
+| 54 | **Versions in M6.** `@modelcontextprotocol/server` and `/client` were upgraded from 2.3.1 to **2.4.0** (the registry had a new version since M1), and `@modelcontextprotocol/node` **2.1.2** was added (it needs `server` ^2.4.0 and brings `hono` and `@hono/node-server`). All the earlier suites passed unchanged after the upgrade | run in M6 | M6 | ✅ |
+| 55 | **The HTTP server API.** `createMcpHandler(factory)` (from `@modelcontextprotocol/server`) returns a handler with a web-standard `fetch(request)`; the factory is called for **every request** (so `createServer()` is reused as it is). The handler does **no checks of its own**: no token check, no Origin or Host check (its documentation says it is "deliberately validation-free"). `toNodeHandler(handler)` from `@modelcontextprotocol/node` makes it work with `node:http`. The SDK has helpers for the checks: `hostHeaderValidationResponse(request, localhostAllowedHostnames())` and `originValidationResponse(request, localhostAllowedOrigins())` return a `403` response, or nothing when the request may go on | run in M6 | M6 | ✅ |
+| 56 | **Our checks in front of the handler** (`http-server.ts`), in this order: only the path `/mcp` (`404`); Host and Origin must be this computer (`403`, even with the right token, so a web page in a browser cannot call it); a bearer token compared in constant time after hashing both sides (`401` with `WWW-Authenticate: Bearer`); a body over 64 KB (`413`). It listens on `127.0.0.1` only, refuses to start with a token under 16 characters, and writes one log line per request without the token. The token comes from `MCP_HTTP_TOKEN`; `.env` was not changed, the demo used a token made for that run | run in M6 | M6 | ✅ |
+| 57 | **The client over HTTP.** `new StreamableHTTPClientTransport(new URL(url), { authProvider: { token: async () => token } })` sends `Authorization: Bearer <token>` with every request. A wrong or missing token makes `connect()` throw (`UnauthorizedError: Unauthorized`) | run in M6 | M6 | ✅ |
+| 58 | **What one agent run looks like to the HTTP server** (its log): `POST /mcp -> 200` (the connection), `POST -> 202` (a notification, no body answer), `GET /mcp -> 405` (the client tries to open an event stream, and this stateless server says it has none), `POST -> 200` (tools/list), `POST -> 200` (tools/call). Every call is one POST, with no session id. A request without a token (`curl`) got `401` | run in M6 | M6 | ✅ |
+| 59 | **The price of the hop is small.** 30 calls of `list_documents` (about 52 ms of Qdrant work), three ways, several runs: directly 52 to 60 ms (median), over stdio 49 to 61 ms, over HTTP 59 to 64 ms. The differences (from −8 to +11 ms) are inside the noise of the Qdrant call, so the protocol, the subprocess pipe and the HTTP request cost **under about 10 ms** per call. The one-time costs are bigger: starting our server as a subprocess takes **1.5 to 2.7 s**, and connecting over HTTP 46 to 81 ms | run in M6 | M6 | ✅ |
+| 60 | **`MCP_LOG=off` does not reach a server started by the client**, because the server only gets the short environment of fact 45. Its stderr log lines went on appearing (and, in the first overhead run, made stdio look about 9 ms slower, because the subprocess printed 60 lines). To silence it, the command needs its own `env: { MCP_LOG: "off" }` | run in M6 | M6 | ✅ |
 
 **Not known yet** (to be found by running it): how a Streamable HTTP server is started with the v2 package and what the authentication helpers look like (M6), and how a real host (Claude Code or Claude Desktop) shows the server (not tried). (How the filesystem server is started is now known: fact 20.)
 
@@ -198,13 +205,17 @@ src/mcp/
   host-demo.ts        npm run mcp:host: list, read and run resources and a prompt, like a host does   (exists)
   safety.ts           the rules around a server: allowlist, approval, limits, untrusted wrapper        (M5, exists)
   servers.ts          the servers the agent uses (ours, and the filesystem server) and their rules     (M5, exists)
-  http-server.ts      Streamable HTTP entry point                       (M6)
+  create-server.ts    the server: tools, resources, prompt (used by both entries)                    (M2 to M3, moved in M6)
+  http-server.ts      the server over HTTP: path, host, origin, token, size checks                    (M6, exists)
+  http-index.ts       npm run mcp:http                                                                (M6, exists)
+  summary.ts          runs one question through the MCP agent for the evaluation                      (M6, exists)
+  overhead.ts         npm run mcp:overhead: direct, stdio and HTTP call times                         (M6, exists)
   m1-wire-trace.ts    M1: raw messages to a ready-made server, printed (learning script, exists)
   tests/              offline tests and protocol tests (fake-server.ts is a server that misbehaves)
 docs/MCP-SPEC.md      this file
 ```
 
-**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `mcp:agent` (ask the MCP agent), `mcp:host` (use a resource and a prompt like a host does), `test:mcp-tools`, `test:mcp-resources`, `test:mcp-server`, `test:mcp-adapter`, `test:mcp-client`, `test:mcp-agent`, `test:mcp-safety`, `test:mcp-servers`. `mcp:agent` also takes `--files <folder>` (the filesystem server limited to that folder). **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
+**Scripts that exist:** `mcp:m1-trace`, `mcp:server` (run the server), `mcp:agent` (ask the MCP agent), `mcp:host` (use a resource and a prompt like a host does), `test:mcp-tools`, `test:mcp-resources`, `test:mcp-server`, `test:mcp-adapter`, `test:mcp-client`, `test:mcp-agent`, `test:mcp-safety`, `test:mcp-servers`, `test:mcp-http`, `mcp:http` (the server over HTTP), `mcp:overhead`. `mcp:agent` also takes `--files <folder>` (the filesystem server limited to that folder) and `--url <address>` (our server over HTTP; the token is read from `MCP_HTTP_TOKEN`). `agent:behaviour` takes `--mcp`, `--mcp-http` and `--skip <categories>`. **Planned** (added by the phase that needs them): `mcp:inspect` (the Inspector against it), `mcp:agent` (ask the MCP agent a question), `test:mcp-*` (one per area).
 
 **Dependencies:** `@modelcontextprotocol/server` and `@modelcontextprotocol/client` (both 2.3.1, installed in M2; the client is needed by the protocol tests, and M4 uses it again). The Inspector is run with `npx` and is not installed. `@langchain/mcp-adapters` was tried with `--no-save` in M4 and is **not** a dependency.
 
@@ -576,7 +587,7 @@ Results are in facts 46 to 50.
 
 ---
 
-### Phase M6: Remote server and evaluation ⏭️ *next lesson*
+### Phase M6: Remote server and evaluation ✅
 
 Learn what changes over HTTP, and measure the result.
 
@@ -593,7 +604,83 @@ Learn what changes over HTTP, and measure the result.
 
 **Design:** section 8, facts 4, 12.
 
-**Record:** (empty)
+**Record (done 2026-10-26)**
+
+*What was built.*
+
+| File | What it is |
+|---|---|
+| `create-server.ts` | `createServer()`, moved out of `server.ts`: the three tools, the two resources and the prompt. Both entries use it |
+| `server.ts` | Now only `serveStdio(createServer)` (12 lines) |
+| `http-server.ts` | `startHttpServer({ port, token })`: the SDK handler behind our checks (fact 56), served by `node:http` on `127.0.0.1`. Port 0 picks a free port (the tests and the evaluation use it). Returns `{ url, close }` |
+| `http-index.ts` | `npm run mcp:http`: reads `MCP_HTTP_TOKEN` (required) and `MCP_HTTP_PORT` (default 3333) from `.env` and starts it |
+| `client.ts` | `ServerTarget` is a command (stdio) or `{ url, token }` (HTTP); `connectToServer` picks the transport |
+| `servers.ts` | `documentsHttpServer(url, token)`: the same server and the same rules, reached over HTTP |
+| `agent.ts`, `summary.ts` | `ask(question, history)` takes earlier turns (needed for the follow-up questions); `runMcpForEvaluation` returns the numbers the behaviour check compares |
+| `overhead.ts` | Times the same tool called directly, over stdio and over HTTP |
+| `src/scripts/agent-harness.ts`, `agent-behaviour.ts` | `--mcp`, `--mcp-http` (the HTTP server is started in the same process with a token made for the run) and `--skip` (leave out categories). The code that runs the other agents is now one loop instead of one block per agent |
+
+*How to run it.*
+
+```bash
+# start the server over HTTP (put MCP_HTTP_TOKEN=<16 or more characters> in .env first)
+npm run mcp:http
+# in another terminal: the agent, using the server at that address
+npm run mcp:agent -- --url http://127.0.0.1:3333/mcp "What is Kafka? Answer in one sentence."
+# the comparison
+npm run agent:behaviour -- --langgraph --mcp --mcp-http --repeat 2 --skip arithmetic,datetime
+npm run agent:behaviour -- --langgraph --mcp --mcp-http --repeat 2 --skip arithmetic,datetime --file agent-fresh.jsonl
+```
+
+*The evaluation* (section 8; each agent answered every question twice in the same session; the same judge; the prompts were not changed; open decision 8 was answered by leaving out the arithmetic and date questions, because the MCP server has no calculator or date tool: 14 of the 17 tuned questions and 13 of the 16 fresh ones remain). Results are in `eval/results/behaviour-2026-10-26T07-25-26-008Z.json` and `…T07-33-18-719Z.json`.
+
+| | Hand-built | LangGraph | MCP, stdio | MCP, HTTP |
+|---|---|---|---|---|
+| **Tuned questions** (28 runs): task success | 26 (93%) | 26 (93%) | 26 (93%) | 26 (93%) |
+| **Fresh questions** (26 runs): task success | 23 (88%) | 24 (92%) | 24 (92%) | 24 (92%) |
+| **Both** (54 runs) | 49 (91%) | 50 (93%) | 50 (93%) | 50 (93%) |
+| Model calls per run (tuned / fresh) | 2.11 / 2.27 | 2.07 / 2.42 | 2.00 / 2.19 | 2.00 / 2.19 |
+| Tool calls per run (tuned / fresh) | 1.29 / 1.31 | 1.21 / 1.42 | 1.14 / 1.50 | 1.14 / 1.42 |
+| Chat tokens per run (tuned / fresh) | 4072 / 4168 | 4233 / 5199 | 3095 / 3694 | 3096 / 3600 |
+| Cost per run (tuned / fresh) | $0.00066 / $0.00067 | $0.00068 / $0.00082 | $0.00051 / $0.00060 | $0.00051 / $0.00058 |
+| Latency per run (tuned / fresh) | 3.4 s / 3.4 s | 3.3 s / 4.1 s | 2.8 s / 3.0 s | 2.8 s / 3.0 s |
+
+*What the numbers say.*
+- **The quality is the same.** All four agents have the same success rate on the tuned questions. On the fresh ones the three agents built with LangGraph scored the same (24 of 26), and the hand-built agent one run less (it was marked wrong once on a comparison question). One run of difference in 26 is noise. The same two groups of questions failed in all four agents, so the cause is the prompt and the questions again, not the agent or the transport: the "in one line" format question (tuned, 0 of 2 in every agent) and the failed-tool question, where no agent says that the chunk id was not found (fresh, 0 of 2 in every agent).
+- **MCP over stdio and over HTTP behave the same.** The scores and the steps match, the tokens are close (3095 against 3096, and 3694 against 3600), and the difference in time is inside the noise (fact 59).
+- **The MCP agent used 27% to 29% fewer tokens than the LangGraph agent** (3095 against 4233 on the tuned questions, 3694 against 5199 on the fresh ones), and cost and time per run were lower in the same way. **This is not an advantage of MCP.** The MCP agent offers 3 tools and the LangGraph agent 6 (the calculator, the date and the email tool are not on the MCP server), so each model call carries less. The hand-built agent has 5 tools and sits in between. It was not tested with the LangGraph agent cut down to 3 tools, so the size of the effect of the tool list alone is not measured.
+- **The extra time per call is small**: under about 10 ms for the protocol and the hop (fact 59). Starting the stdio server (1.5 to 2.7 s) is a one-time cost per agent, which the evaluation paid once, not per question.
+
+*What it takes to have the same agent with MCP* (lines, without blank lines and comments, with all lines in brackets): the **agent side** is 448 (653) lines (`agent`, `adapter`, `client`, `safety`, `servers`, `prompt`, `config`, `log`, `agent-index`, `summary`), of which the rules for untrusted servers (`safety.ts`) are 99 (143). The **server side** is 386 (525) lines (the two entries, `create-server`, `http-server`, `http-index`, resources, prompt, retrieval and the three tools), of which the HTTP checks are 77 (110). For comparison, the LangGraph agent core was 722 (976) lines with six tools. So the MCP version has two parts of similar size: an agent side that talks to servers and keeps them in check, and a server side that any other app can use too.
+
+*What MCP changed, and what it did not* (the expectation of section 4, checked):
+- **It changed where the tool lives**: in a separate program that Claude Desktop, the Inspector, our agent and a script can all use, over a pipe or HTTP, with the same definitions.
+- **It did not change the guardrails.** The allowlist, the approval, the limits, the wrapper for untrusted text and the token all had to be written. The protocol gives a place to put them (a call to a server) and the spec asks the host to do it, but does none of it. The model went around a blocked tool (fact 50), and a server can hang or send a huge result (fact 51). Every guard is code in `safety.ts` and `http-server.ts`.
+- **It did not change the quality**, and the speed cost per call was too small to measure against a 50 ms Qdrant call.
+
+*What was checked.*
+
+| Check | Result |
+|---|---|
+| `test:mcp-http` (11 tests, the server in this process on a free port): no token and a wrong token (`401`); a foreign Host and a foreign Origin (`403`, with the right token); another path (`404`); a body over 64 KB (`413`); a request with the right token gets past the checks; the SDK client with the right token lists the tools; a tool call over HTTP reaches the real tool; a wrong or missing token cannot connect; a token under 16 characters is refused at start | 11 passed |
+| The server as a separate process (`npm run mcp:http`) and the agent with `--url` | worked; a request without a token got `401`, the agent with a wrong token failed with `UnauthorizedError` |
+| The evaluation (above) and `mcp:overhead` (several runs) | facts 59 and 60 |
+| All earlier suites after the upgrade to 2.4.0: tools 14, resources 12, server 13, adapter 9, client 6, safety 17, servers 8, agent 5 (real), and the LangGraph suites (api 18, research 9, stream 7, approve 6, memory 7, state 7, tool-node 8, tools 12) | all passed |
+
+*What surprised me.*
+- **The HTTP server is mostly checks.** The SDK part is a few lines (`createMcpHandler`, `toNodeHandler`); the rest of `http-server.ts` is the token, Host, Origin and size checks, because the handler checks nothing (fact 55).
+- **Moving `createServer()` made both entries tiny.** Once the server definition did not know about the transport, stdio and HTTP were each about a dozen lines.
+- **The environment of the subprocess hid a variable I had set** (fact 60). It is the same rule that keeps our API key out of third-party servers, so it can be a feature and a surprise in the same minute.
+- **The hop is cheaper than the model's mood.** The difference between runs of the same agent (one question taking 3 s, the next 5 s) is far bigger than the cost of the protocol.
+
+*Not checked / not built.*
+- **OAuth.** Only the static bearer token. A real remote server would need per-user tokens, expiry and a way to revoke them; the SDK has OAuth helpers (client side) that were not used.
+- **A server on another computer** (HTTPS, a real network, a proxy). Only `127.0.0.1` was used, with plain HTTP.
+- **Several clients at once, and a server that restarts** while a client is connected.
+- **A fair match of the tool lists** (3, 5 and 6 tools), so the token numbers are not a pure transport comparison.
+- **Rate limits, and cost limits per token.**
+- **A real host connecting to the HTTP server.**
+
 
 ---
 
@@ -631,10 +718,10 @@ The same rules as in the LangGraph evaluation: the same questions, the same judg
 2. ~~Adapter.~~ **Decided in M4: our own `adapter.ts` stays for now**; the library was compared and not kept. M5 must solve tool-name clashes between servers (a prefix, as the library does).
 3. ~~Host for the real test in M2.~~ **The Inspector was used.** A real host (Claude Code or Claude Desktop) is still open: the config is written and untested.
 4. ~~Third-party server in M5.~~ **Decided in M5: the reference filesystem server on a sample folder**, 4 of its 14 tools allowed, writing behind approval.
-5. **Authentication in M6:** a static bearer token is built; OAuth is only described. *Proposed.*
-6. **Where the HTTP server runs in M6:** a separate Node process, not a Next.js route. *Proposed.*
+5. ~~Authentication in M6.~~ **Decided: a static bearer token** (from `MCP_HTTP_TOKEN`); OAuth is only described.
+6. ~~Where the HTTP server runs.~~ **Decided: a separate Node process** (`npm run mcp:http`).
 7. ~~Whether `src/mcp/agent.ts` keeps approval, memory and streaming.~~ **Decided in M4: no**; only the small loop (plus approval in M5).
-8. **Parity for the evaluation (M6):** add `calculate` and `get_current_datetime` to the server, or leave the arithmetic and date questions out of the comparison. *Open.*
+8. ~~Parity for the evaluation.~~ **Decided in M6: the arithmetic and date questions were left out** (`--skip arithmetic,datetime`), and the server was not changed. The tool lists still differ (3, 5 and 6 tools), which is said in the results.
 
 ---
 
@@ -663,8 +750,8 @@ Items are checked off as phases complete.
 - [x] Resources and a prompt are served and read: tested offline, through the SDK client and through the Inspector. *(M3; a real host was not tried)*
 - [x] An agent answers a question using tools that come from the server, and the hand-written adapter is compared with `@langchain/mcp-adapters`. *(M4: `test:mcp-agent`, and the comparison table in the M4 record)*
 - [x] A third-party server is connected behind an allowlist and an approval rule; hostile, hanging and oversized results are tested. *(M5: `test:mcp-safety`, `test:mcp-servers`, and the real runs of facts 46 to 50)*
-- [ ] The server also runs over HTTP with a token check, and the cases without a token or with a wrong one are rejected. *(M6)*
-- [ ] The evaluation ran with `--mcp` next to `--langgraph`, and the results and what MCP did and did not change are written here. *(M6)*
+- [x] The server also runs over HTTP with a token check, and the cases without a token or with a wrong one are rejected. *(M6: `test:mcp-http`, and the run of fact 58)*
+- [x] The evaluation ran with `--mcp` next to `--langgraph`, and the results and what MCP did and did not change are written here. *(M6: the M6 record)*
 - [ ] Existing suites still pass (the LangGraph tests and the hand-built agent's tests).
 - [ ] Code follows the principles in section 3 throughout.
 - [ ] No outbound calls other than OpenAI, Qdrant and the servers chosen in M5.
