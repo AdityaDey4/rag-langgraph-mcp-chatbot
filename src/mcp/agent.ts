@@ -6,10 +6,12 @@ import { END, GraphRecursionError, MessagesAnnotation, START, StateGraph } from 
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { ChatOpenAI } from "@langchain/openai";
 import { loadTools } from "./adapter";
-import { connectToServer, ownServer, type ServerCommand } from "./client";
+import { connectToServer } from "./client";
 import { CHAT_MODEL } from "./config";
 import { log } from "./log";
 import { SYSTEM_PROMPT } from "./prompt";
+import { checkNamesAreUnique, makeSafeSource, type Approve } from "./safety";
+import { documentsServer, type ServerConfig } from "./servers";
 
 export type ToolCallRecord = {
   name: string;
@@ -26,10 +28,32 @@ export type AgentRun = {
 };
 
 // Example: createMcpAgent() starts our server, reads its tools and returns { toolNames: ["search_documents", …], ask, close }
-export async function createMcpAgent(server: ServerCommand = ownServer) {
-  // 1. Start the server and ask it for its tools.
-  const client = await connectToServer(server);
-  const tools = await loadTools(client);
+// With a second server: createMcpAgent([documentsServer, filesServer("C:/shared")], askAPerson)
+// `approve` is asked before a tool that needs approval runs. The default says no to everything.
+export async function createMcpAgent(servers: ServerConfig[] = [documentsServer], approve: Approve = async () => false) {
+  // 1. Start every server and ask it for its tools. Each server sits behind its own rules (safety.ts).
+  const clients: Awaited<ReturnType<typeof connectToServer>>[] = [];
+  const tools = [];
+
+  try {
+    for (const config of servers) {
+      const client = await connectToServer(config.server);
+      clients.push(client);
+
+      const safeSource = makeSafeSource(client, config.policy, approve);
+      tools.push(...(await loadTools(safeSource)));
+    }
+
+    checkNamesAreUnique(tools.map((tool) => tool.name));
+  } catch (error) {
+    // Do not leave the servers that were already started running.
+    await Promise.all(clients.map((client) => client.close()));
+    throw error;
+  }
+
+  // The instructions of the model, plus one hint for every server that has one.
+  const hints = servers.flatMap((config) => (config.hint ? [config.hint] : []));
+  const systemPrompt = [SYSTEM_PROMPT, ...hints].join("\n\n");
 
   // 2. The model is told about the tools (it only asks for them; it never runs them).
   const model = new ChatOpenAI({ model: CHAT_MODEL, temperature: 0, maxRetries: 2 }).bindTools(tools);
@@ -39,7 +63,7 @@ export async function createMcpAgent(server: ServerCommand = ownServer) {
     const kinds = ["system", ...state.messages.map((message) => message.getType())].join(", ");
     log("agent", `model: sending ${state.messages.length + 1} messages (${kinds})`);
 
-    const response = await model.invoke([new SystemMessage(SYSTEM_PROMPT), ...state.messages]);
+    const response = await model.invoke([new SystemMessage(systemPrompt), ...state.messages]);
 
     if (response.tool_calls?.length) {
       const asked = response.tool_calls.map((call) => `${call.name} ${JSON.stringify(call.args)}`).join(" | ");
@@ -113,9 +137,9 @@ export async function createMcpAgent(server: ServerCommand = ownServer) {
     }
   }
 
-  // 7. Stop the server (closing the client ends its process).
+  // 7. Stop the servers (closing a client ends its process).
   async function close() {
-    await client.close();
+    await Promise.all(clients.map((client) => client.close()));
   }
 
   return { toolNames: tools.map((tool) => tool.name), ask, close };

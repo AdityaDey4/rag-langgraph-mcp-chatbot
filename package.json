@@ -37,6 +37,8 @@
     "test:mcp-server": "tsx src/mcp/tests/test-server.ts",
     "test:mcp-adapter": "tsx src/mcp/tests/test-adapter.ts",
     "test:mcp-client": "tsx src/mcp/tests/test-client.ts",
+    "test:mcp-safety": "tsx src/mcp/tests/test-safety.ts",
+    "test:mcp-servers": "tsx src/mcp/tests/test-servers.ts",
     "test:mcp-agent": "tsx src/mcp/tests/test-agent.ts",
     "test:mcp-resources": "tsx src/mcp/tests/test-resources.ts"
   },

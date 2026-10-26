@@ -9,6 +9,9 @@ import { log } from "./log";
 export type ServerCommand = {
   command: string;
   args: string[];
+  // Extra environment variables for the server. Without this the server gets only a short, safe list (PATH, TEMP, …),
+  // so it cannot read our OPENAI_API_KEY or other secrets from the environment.
+  env?: Record<string, string>;
 };
 
 // Our own server (server.ts). Node runs the local tsx, and tsx runs the file. Absolute paths, so the working directory does not matter.
@@ -25,7 +28,7 @@ export const ownServer: ServerCommand = {
 // Example: connectToServer() returns a client that is connected to a freshly started copy of our server
 export async function connectToServer(server: ServerCommand = ownServer) {
   const client = new Client({ name: "rag-agent", version: "1.0.0" });
-  const transport = new StdioClientTransport({ command: server.command, args: server.args });
+  const transport = new StdioClientTransport({ command: server.command, args: server.args, env: server.env });
 
   log("agent", `starting the server: ${path.basename(server.args.at(-1) ?? server.command)}`);
   await client.connect(transport);
