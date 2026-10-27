@@ -8,6 +8,8 @@ import {
   runAgentOnce,
   runClassicOnce,
   runLangGraphOnce,
+  runMcpOnce,
+  closeMcp,
   saveResults,
   toolNames,
   usd,
@@ -23,6 +25,9 @@ expected TOOL BEHAVIOUR with code, and judges the ANSWER with an LLM rubric.
 Options:
   --classic       Also run every question through /api/ask for comparison (E5)
   --langgraph     Also run every question through the LangGraph agent (src/langgraph)
+  --mcp           Also run every question through the MCP agent (src/mcp), with our server started as a subprocess (stdio)
+  --mcp-http      Also run every question through the MCP agent, with our server reached over HTTP with a token
+  --skip <a,b>    Leave out these categories (the MCP server has no calculator or date tool: --skip arithmetic,datetime)
   --file <name>   Questions file in eval/ (default agent.jsonl)
   --repeat <n>    Run each question n times (default 1; models are not deterministic)
   --only <id,id>  Only run these question ids
@@ -58,11 +63,14 @@ type Outcome = {
 };
 
 function parseArgs(argv: string[]) {
-  const options = { classic: false, langgraph: false, file: "agent.jsonl", repeat: 1, only: null as string[] | null };
+  const options = { classic: false, langgraph: false, mcp: false, mcpHttp: false, skip: [] as string[], file: "agent.jsonl", repeat: 1, only: null as string[] | null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--classic") options.classic = true;
     else if (arg === "--langgraph") options.langgraph = true;
+    else if (arg === "--mcp") options.mcp = true;
+    else if (arg === "--mcp-http") options.mcpHttp = true;
+    else if (arg === "--skip") options.skip = (argv[++i] ?? "").split(",").filter(Boolean);
     else if (arg === "--file") options.file = argv[++i] ?? options.file;
     else if (arg === "--repeat") options.repeat = Math.max(1, Number(argv[++i]) || 1);
     else if (arg === "--only") options.only = (argv[++i] ?? "").split(",").filter(Boolean);
@@ -173,6 +181,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   let questions = loadQuestions(options.file);
   if (options.only) questions = questions.filter((q) => options.only!.includes(q.id));
+  if (options.skip.length) questions = questions.filter((q) => !options.skip.includes(q.category));
 
   console.log(
     `Running ${questions.length} questions (${options.file}) x ${options.repeat} through the agent${options.classic ? " and Classic RAG" : ""}${options.langgraph ? " and the LangGraph agent" : ""}\n`
@@ -180,7 +189,14 @@ async function main() {
 
   const agentOutcomes: Outcome[] = [];
   const classicOutcomes: Outcome[] = [];
-  const langgraphOutcomes: Outcome[] = [];
+
+  // The other agents to compare with. Each one answers every question after the first agent and is judged in the same way.
+  const others = [
+    { enabled: options.langgraph, key: "langgraph", label: "LANGGRAPH AGENT", run: (q: Question) => runLangGraphOnce(q.question, q.history) },
+    { enabled: options.mcp, key: "mcp", label: "MCP AGENT (stdio)", run: (q: Question) => runMcpOnce(q.question, q.history, "stdio") },
+    { enabled: options.mcpHttp, key: "mcp-http", label: "MCP AGENT (http)", run: (q: Question) => runMcpOnce(q.question, q.history, "http") },
+  ].filter((other) => other.enabled);
+  const otherOutcomes: Record<string, Outcome[]> = Object.fromEntries(others.map((other) => [other.key, []]));
 
   for (const q of questions) {
     for (let attempt = 1; attempt <= options.repeat; attempt++) {
@@ -224,27 +240,27 @@ async function main() {
         );
       }
 
-      if (options.langgraph) {
-        const graphRun = await runLangGraphOnce(q.question, q.history);
-        const graphFailures = graphRun.error ? [`run failed: ${graphRun.error}`] : checkTools(graphRun, q.checks);
-        const graphVerdict = await judge(q.question, q.expect, graphRun.answer);
-        const graphOutcome: Outcome = {
+      for (const other of others) {
+        const otherRun = await other.run(q);
+        const otherFailures = otherRun.error ? [`run failed: ${otherRun.error}`] : checkTools(otherRun, q.checks);
+        const otherVerdict = await judge(q.question, q.expect, otherRun.answer);
+        const otherOutcome: Outcome = {
           id: q.id,
           category: q.category,
-          run: graphRun,
-          toolFailures: graphFailures,
-          verdict: graphVerdict,
-          pass: graphFailures.length === 0 && graphVerdict.pass,
+          run: otherRun,
+          toolFailures: otherFailures,
+          verdict: otherVerdict,
+          pass: otherFailures.length === 0 && otherVerdict.pass,
         };
-        langgraphOutcomes.push(graphOutcome);
+        otherOutcomes[other.key].push(otherOutcome);
 
         console.log(
-          `  langgraph ${graphOutcome.pass ? "PASS" : "FAIL"} steps=${graphRun.steps} tools=[${toolNames(graphRun).join(",")}] ${(graphRun.latencyMs / 1000).toFixed(1)}s ${usd(graphRun.costUsd)}`
+          `  ${pad(other.key, 9)} ${otherOutcome.pass ? "PASS" : "FAIL"} steps=${otherRun.steps} tools=[${toolNames(otherRun).join(",")}] ${(otherRun.latencyMs / 1000).toFixed(1)}s ${usd(otherRun.costUsd)}`
         );
-        if (!graphOutcome.pass) {
-          for (const failure of graphFailures) console.log(`       tools : ${failure}`);
-          if (!graphVerdict.pass) console.log(`       answer: ${graphVerdict.reason}`);
-          console.log(`       said  : ${oneLine(graphRun.answer, 160)}`);
+        if (!otherOutcome.pass) {
+          for (const failure of otherFailures) console.log(`       tools : ${failure}`);
+          if (!otherVerdict.pass) console.log(`       answer: ${otherVerdict.reason}`);
+          console.log(`       said  : ${oneLine(otherRun.answer, 160)}`);
         }
       }
     }
@@ -252,14 +268,14 @@ async function main() {
 
   const agentSummary = summarise("AGENT", agentOutcomes);
   const classicSummary = options.classic ? summarise("CLASSIC RAG", classicOutcomes) : null;
-  const langgraphSummary = options.langgraph ? summarise("LANGGRAPH AGENT", langgraphOutcomes) : null;
+  const otherSummaries = others.map((other) => ({ key: other.key, summary: summarise(other.label, otherOutcomes[other.key]) }));
 
   // Success by category, to see where each approach wins.
-  if (classicSummary || langgraphSummary) {
+  if (classicSummary || others.length > 0) {
     const columns = [
       { name: "agent", outcomes: agentOutcomes },
       ...(classicSummary ? [{ name: "classic", outcomes: classicOutcomes }] : []),
-      ...(langgraphSummary ? [{ name: "langgraph", outcomes: langgraphOutcomes }] : []),
+      ...others.map((other) => ({ name: other.key, outcomes: otherOutcomes[other.key] })),
     ];
 
     console.log(`\nBY CATEGORY (task success)   ${columns.map((column) => pad(column.name, 10)).join(" ")}`);
@@ -278,12 +294,15 @@ async function main() {
     options,
     agent: { summary: agentSummary, outcomes: agentOutcomes },
     classic: classicSummary ? { summary: classicSummary, outcomes: classicOutcomes } : null,
-    langgraph: langgraphSummary ? { summary: langgraphSummary, outcomes: langgraphOutcomes } : null,
+    ...Object.fromEntries(otherSummaries.map((other) => [other.key, { summary: other.summary, outcomes: otherOutcomes[other.key] }])),
   });
   console.log(`\nSaved ${file}`);
+
+  await closeMcp(); // stops the MCP agent's server, if one was started
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error("Behaviour check crashed:", error);
+  await closeMcp().catch(() => {});
   process.exit(1);
 });
